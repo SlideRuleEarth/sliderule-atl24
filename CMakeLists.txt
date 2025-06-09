@@ -28,7 +28,9 @@ target_compile_definitions (atl24 PUBLIC BINID="${TGTVER}")
 
 # Set Environment Variables #
 set (INSTALLDIR /usr/local CACHE STRING "Installation directory for library and executables")
+set (INCLUDEDIR ${INSTALLDIR}/include)
 set (CONFDIR ${INSTALLDIR}/etc/sliderule)
+set (PLUGINDIR ${INSTALLDIR}/lib/sliderule)
 
 # Debug Configuration #
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -52,7 +54,12 @@ target_include_directories (atl24
 )
 
 # Plugin Installation #
-install (TARGETS atl24 LIBRARY DESTINATION ${CONFDIR})
+install (
+    TARGETS 
+        atl24 LIBRARY 
+    DESTINATION 
+        ${PLUGINDIR}
+)
 install (
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24g2.lua
@@ -63,5 +70,5 @@ install (
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24.h
     DESTINATION
-        ${INSTALLDIR}/include/sliderule/atl24
+        ${INCLUDEDIR}/atl24
 )

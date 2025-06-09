@@ -1,13 +1,6 @@
 ROOT = $(shell pwd)
 BUILD = $(ROOT)/build
-
 USERCFG ?=
-
-CLANG_VER ?= ""
-
-########################
-# Application Targets
-########################
 
 all: ## build code
 	make -j8 -C $(BUILD)
