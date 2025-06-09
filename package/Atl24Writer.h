@@ -29,61 +29,67 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __atl24_writer__
+#define __atl24_writer__
+
 /******************************************************************************
- *INCLUDES
+ * INCLUDES
  ******************************************************************************/
 
-#include "LuaEngine.h"
+#include "OsApi.h"
+#include "EventLib.h"
+#include "LuaObject.h"
+#include "HdfLib.h"
 #include "icesat2/Icesat2Fields.h"
-
-#include "Atl24Writer.h"
-
-/******************************************************************************
- * DEFINES
- ******************************************************************************/
-
-#define LUA_ATL24_LIBNAME    "atl24"
+#include "icesat2/Atl24DataFrame.h"
 
 /******************************************************************************
- * LOCAL FUNCTIONS
+ * CLASS DECLARATION
  ******************************************************************************/
 
-/*----------------------------------------------------------------------------
- * atl24_open
- *----------------------------------------------------------------------------*/
-int atl24_open (lua_State *L)
+class Atl24Writer: public LuaObject
 {
-    static const struct luaL_Reg atl24_functions[] = {
-        {"hdf5file",    Atl24Writer::luaCreate},
-        {NULL,          NULL}
-    };
+    public:
 
-    luaL_newlib(L, atl24_functions);
+        /*--------------------------------------------------------------------
+         * Constants
+         *--------------------------------------------------------------------*/
 
-    return 1;
-}
+        static const char* OBJECT_TYPE;
+        static const char* LUA_META_NAME;
+        static const struct luaL_Reg LUA_META_TABLE[];
 
-/******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************/
+        static const int NUM_BEAMS = Icesat2Fields::NUM_SPOTS;
+        static const char* BEAMS[NUM_BEAMS];
 
-extern "C" {
-void initatl24 (void)
-{
-    /* Initialize Modules */
-    Atl24Writer::init();
+        /*--------------------------------------------------------------------
+         * Typedefs
+         *--------------------------------------------------------------------*/
 
-    /* Extend Lua */
-    LuaEngine::extend(LUA_ATL24_LIBNAME, atl24_open);
+        /*--------------------------------------------------------------------
+         * Methods
+         *--------------------------------------------------------------------*/
 
-    /* Indicate Presence of Package */
-    LuaEngine::indicate(LUA_ATL24_LIBNAME, LIBID);
+        static void init (void);
 
-    /* Display Status */
-    print2term("%s package initialized (%s)\n", LUA_ATL24_LIBNAME, LIBID);
-}
+        static int luaCreate (lua_State* L);
 
-void deinitatl24 (void)
-{
-}
-}
+    private:
+
+        /*--------------------------------------------------------------------
+         * Methods
+         *--------------------------------------------------------------------*/
+
+        Atl24Writer  (lua_State* L, Atl24DataFrame** _dataframes);
+        ~Atl24Writer (void) override;
+
+        static int luaWriteFile (lua_State* L);
+
+        /*--------------------------------------------------------------------
+         * Data
+         *--------------------------------------------------------------------*/
+
+         Atl24DataFrame* dataframes[NUM_BEAMS];
+};
+
+#endif  /* __atl24_writer__ */
