@@ -37,6 +37,7 @@
 #include "OsApi.h"
 #include "EventLib.h"
 #include "List.h"
+#include "GeoDataFrame.h"
 #include "icesat2/Atl24DataFrame.h"
 
 /******************************************************************************
@@ -51,6 +52,33 @@ const struct luaL_Reg Atl24Writer::LUA_META_TABLE[] = {
 };
 
 const char* Atl24Writer::BEAMS[NUM_BEAMS] = {"gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"};
+
+/******************************************************************************
+ * LOCAL FUNCTIONS
+ ******************************************************************************/
+
+static void add_group(List<HdfLib::dataset_t>& datasets, const char* name)
+{
+    HdfLib::dataset_t group = {name, HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0} ;
+    datasets.add(group);
+}
+
+static void add_variable(List<HdfLib::dataset_t>& datasets, const char* name, Field* field)
+{
+    long size = field->length() * field->getTypeSize();
+    uint8_t* buffer = new uint8_t[size];
+    field->serialize(buffer, size);
+    HdfLib::dataset_t variable = {name, HdfLib::VARIABLE, static_cast<RecordObject::fieldType_t>(field->getEncodedType()), buffer, size};
+    datasets.add(variable);
+}
+
+static void add_attribute(List<HdfLib::dataset_t>& datasets, const char* name, const char* value)
+{
+    long size = StringLib::size(value) + 1;
+    char* buffer = StringLib::duplicate(value);
+    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::STRING, reinterpret_cast<uint8_t*>(buffer), size};
+    datasets.add(attribute);
+}
 
 /******************************************************************************
  * METHODS
@@ -80,7 +108,10 @@ int Atl24Writer::luaCreate (lua_State* L)
             for(int i = 0; i < NUM_BEAMS; i++)
             {
                 lua_getfield(L, dataframe_table_index, BEAMS[i]);
-                _dataframes[i] = dynamic_cast<Atl24DataFrame*>(getLuaObject(L, -1, Atl24DataFrame::OBJECT_TYPE));
+                if(!lua_isnil(L, -1))
+                {
+                    _dataframes[i] = dynamic_cast<Atl24DataFrame*>(getLuaObject(L, -1, GeoDataFrame::OBJECT_TYPE));
+                }
                 lua_pop(L, 1);
             }
         }
@@ -127,34 +158,55 @@ Atl24Writer::~Atl24Writer(void)
 int Atl24Writer::luaWriteFile(lua_State* L)
 {
     bool status;
+    List<HdfLib::dataset_t> datasets;
 
     try
     {
         Atl24Writer* lua_obj = dynamic_cast<Atl24Writer*>(getLuaSelf(L, 1));
         const char* filename = getLuaString(L, 2);
 
-        HdfLib::dataset_t gt1l_group = {"gt1l", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
-        HdfLib::dataset_t gt1r_group = {"gt1r", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
-        HdfLib::dataset_t gt2l_group = {"gt2l", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
-        HdfLib::dataset_t gt2r_group = {"gt2r", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
-        HdfLib::dataset_t gt3l_group = {"gt3l", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
-        HdfLib::dataset_t gt3r_group = {"gt3r", HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0};
+        for(int i = 0; i < NUM_BEAMS; i++)
+        {
+            /* Get and Check DataFrame for Beam */
+            Atl24DataFrame* df = lua_obj->dataframes[i];
+            if(!df) continue;
 
-        List<HdfLib::dataset_t> datasets({
-            gt1l_group,
-            HdfLib::PARENT_DATASET,
-            gt1r_group,
-            HdfLib::PARENT_DATASET,
-            gt2l_group,
-            HdfLib::PARENT_DATASET,
-            gt2r_group,
-            HdfLib::PARENT_DATASET,
-            gt3l_group,
-            HdfLib::PARENT_DATASET,
-            gt3r_group,
-            HdfLib::PARENT_DATASET
-        });
+            /* Create Beam Group */
+            add_group(datasets, BEAMS[i]);
 
+            /* Create Variable - class_ph */
+            add_variable(datasets, "class_ph", &df->class_ph);
+            add_attribute(datasets, "contentType", "modelResults");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "0 - unclassified, 1 - other, 40 - bathymetry, 41 - sea surface");
+            add_attribute(datasets, "long_name", "Photon classification");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "scalar");
+
+            add_variable(datasets, "confidence", &df->confidence);
+            add_variable(datasets, "time_ns", &df->time_ns); // TODO: this will need to be converted into delta_time
+            add_variable(datasets, "ellipse_h", &df->ellipse_h);
+//            add_variable(datasets, "index_ph", &df->index_ph);
+//            add_variable(datasets, "index_seg", &df->index_seg);
+            add_variable(datasets, "invalid_kd", &df->invalid_kd);
+            add_variable(datasets, "invalid_wind_speed", &df->invalid_wind_speed);
+            add_variable(datasets, "lat_ph", &df->lat_ph);
+            add_variable(datasets, "lon_ph", &df->lon_ph);
+            add_variable(datasets, "low_confidence_flag", &df->low_confidence_flag);
+            add_variable(datasets, "night_flag", &df->night_flag);
+            add_variable(datasets, "ortho_h", &df->ortho_h);
+            add_variable(datasets, "sensor_depth_exceeded", &df->sensor_depth_exceeded);
+            add_variable(datasets, "sigma_thu", &df->sigma_thu);
+            add_variable(datasets, "sigma_tvu", &df->sigma_tvu);
+            add_variable(datasets, "surface_h", &df->surface_h);
+            add_variable(datasets, "x_atc", &df->x_atc);
+            add_variable(datasets, "y_atc", &df->y_atc);
+
+            /* Go Back to Parent Group */
+            datasets.add(HdfLib::PARENT_DATASET);
+        }
+
+        /* Write HDF5 File */
         status = HdfLib::write(filename, datasets);
     }
     catch(const RunTimeException& e)
@@ -163,5 +215,12 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         status = false;
     }
 
+    /* Clean Up */
+    for(int i = 0; i < datasets.length(); i++)
+    {
+        delete [] datasets[i].data;
+    }
+
+    /* Return */
     return returnLuaStatus(L, status);
 }
