@@ -13,6 +13,7 @@ rqst["parms"]["atl24"] = {
 local parms     = icesat2.parms(rqst["parms"], rqst["key_space"], "icesat2-atl24", rqst["resource"])
 local userlog   = msg.publish(rspq) -- for alerts
 local atl24h5   = h5.object(parms["asset"], parms["resource"])
+local granule   = icesat2.atl24granule(parms, atl24h5, rspq)
 
 local df = {}
 for _, beam in ipairs(parms["beams"]) do

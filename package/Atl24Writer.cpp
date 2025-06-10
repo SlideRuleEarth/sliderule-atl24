@@ -41,6 +41,7 @@
 #include "FieldColumn.h"
 #include "TimeLib.h"
 #include "icesat2/Atl24DataFrame.h"
+#include "icesat2/Icesat2Fields.h"
 
 /******************************************************************************
  * STATIC DATA
@@ -52,6 +53,8 @@ const struct luaL_Reg Atl24Writer::LUA_META_TABLE[] = {
     {"write",       luaWriteFile},
     {NULL,          NULL}
 };
+
+const char* Atl24Writer::RELEASE = "02";
 
 const char* Atl24Writer::BEAMS[NUM_BEAMS] = {"gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"};
 
@@ -86,7 +89,23 @@ static void add_attribute_double(List<HdfLib::dataset_t>& datasets, const char* 
 {
     double* buffer = new double[1];
     buffer[0] = value;
-    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::DOUBLE, reinterpret_cast<uint8_t*>(buffer), 8};
+    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::DOUBLE, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
+    datasets.add(attribute);
+}
+
+static void add_attribute_int32(List<HdfLib::dataset_t>& datasets, const char* name, const int32_t value)
+{
+    int32_t* buffer = new int32_t[1];
+    buffer[0] = value;
+    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::INT32, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
+    datasets.add(attribute);
+}
+
+static void add_attribute_int8(List<HdfLib::dataset_t>& datasets, const char* name, const int8_t value)
+{
+    int8_t* buffer = new int8_t[1];
+    buffer[0] = value;
+    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::INT32, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
     datasets.add(attribute);
 }
 
@@ -107,12 +126,20 @@ void Atl24Writer::init (void)
  *----------------------------------------------------------------------------*/
 int Atl24Writer::luaCreate (lua_State* L)
 {
+    Icesat2Fields* _parms = NULL;
     Atl24DataFrame* _dataframes[NUM_BEAMS] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    Atl24Granule* _granule = NULL;
 
     try
     {
-        /* Get Parmeters */
-        int dataframe_table_index = 1;
+        int parms_index = 1;
+        int dataframe_table_index = 2;
+        int granule_index = 3;
+
+        /* Get Parameters */
+        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, -1, Icesat2Fields::OBJECT_TYPE));
+
+        /* Get DataFrames */
         if(lua_istable(L, dataframe_table_index))
         {
             for(int i = 0; i < NUM_BEAMS; i++)
@@ -126,12 +153,21 @@ int Atl24Writer::luaCreate (lua_State* L)
             }
         }
 
+        /* Get Granule */
+        _granule = dynamic_cast<Atl24Granule*>(getLuaObject(L, -1, Atl24Granule::OBJECT_TYPE));
+
         /* Return Dispatch Object */
-        return createLuaObject(L, new Atl24Writer(L, _dataframes));
+        return createLuaObject(L, new Atl24Writer(L, _parms, _dataframes, _granule));
     }
     catch(const RunTimeException& e)
     {
         mlog(e.level(), "Error creating %s: %s", LUA_META_NAME, e.what());
+        for(int i = 0; i < NUM_BEAMS; i++)
+        {
+            if(_dataframes[i]) _dataframes[i]->releaseLuaObject();
+        }
+        if(_granule) _granule->releaseLuaObject();
+        if(_parms) _parms->releaseLuaObject();
         return returnLuaStatus(L, false);
     }
 }
@@ -139,8 +175,11 @@ int Atl24Writer::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-Atl24Writer::Atl24Writer(lua_State* L, Atl24DataFrame** _dataframes):
-    LuaObject(L, OBJECT_TYPE, LUA_META_NAME, LUA_META_TABLE)
+Atl24Writer::Atl24Writer(lua_State* L, Icesat2Fields* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule):
+    LuaObject(L, OBJECT_TYPE, LUA_META_NAME, LUA_META_TABLE),
+    release(RELEASE),
+    parms(_parms),
+    granule(_granule)
 {
     for(int i = 0; i < NUM_BEAMS; i++)
     {
@@ -153,12 +192,22 @@ Atl24Writer::Atl24Writer(lua_State* L, Atl24DataFrame** _dataframes):
  *----------------------------------------------------------------------------*/
 Atl24Writer::~Atl24Writer(void)
 {
+    if(parms)
+    {
+        parms->releaseLuaObject();
+    }
+
     for(int i = 0; i < NUM_BEAMS; i++)
     {
         if(dataframes[i])
         {
             dataframes[i]->releaseLuaObject();
         }
+    }
+
+    if(granule)
+    {
+        granule->releaseLuaObject();
     }
 }
 
@@ -173,9 +222,15 @@ int Atl24Writer::luaWriteFile(lua_State* L)
     try
     {
         Atl24Writer* lua_obj = dynamic_cast<Atl24Writer*>(getLuaSelf(L, 1));
+        Icesat2Fields* parms = lua_obj->parms;
+        Atl24Granule& granule = *lua_obj->granule;
+
         const char* filename = getLuaString(L, 2);
 
-        /* Add Beams */
+        /**********************/
+        /* Create Beam Groups */
+        /**********************/
+        Atl24DataFrame* last_df = NULL;
         for(int i = 0; i < NUM_BEAMS; i++)
         {
             /* Get and Check DataFrame for Beam */
@@ -394,7 +449,379 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             datasets.add(HdfLib::PARENT_DATASET);
         }
 
+        /* Check For At Least One Beam */
+        if(last_df == NULL) throw RunTimeException(CRITICAL, RTE_FAILURE, "Attempted to write ATL24 file with no beams");
+
+        /*******************************/
+        /* Create Ancillary Data Group */
+        /*******************************/
+        add_group(datasets, "ancillary_data");
+
+        /* Create Variable - atlas_sdp_gps_epoch */
+        add_variable(datasets, "atlas_sdp_gps_epoch", &granule["atlas_sdp_gps_epoch"]); // double
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS Standard Data Product (SDP) epoch (2018-01-01:T00.00.00.000000 UTC). Add this value to delta time parameters to compute full gps_seconds (relative to the GPS epoch) for each data point.");
+        add_attribute(datasets, "long_name", "ATLAS Epoch Offset");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "seconds since 1980-01-06T00:00:00.000000Z");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - data_end_utc */
+        add_variable(datasets, "data_end_utc", &granule["data_start_utc"]); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "UTC (in CCSDS-A format) of the last data point within the granule.");
+        add_attribute(datasets, "long_name", "End UTC Time of Granule (CCSDS-A, Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - data_start_utc */
+        add_variable(datasets, "data_start_utc", &granule["data_start_utc"]); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "UTC (in CCSDS-A format) of the first data point within the granule.");
+        add_attribute(datasets, "long_name", "Start UTC Time of Granule (CCSDS-A, Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_cycle */
+        add_variable(datasets, "end_cycle", last_df->getMetaData("cycle")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The ending cycle number associated with the data contained within this granule. The cycle number is the counter of the number of 91-day repeat cycles completed by the mission.");
+        add_attribute(datasets, "long_name", "Ending Cycle");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_delta_time */
+        add_variable(datasets, "end_delta_time", &granule["end_delta_time"]); // double
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Number of GPS seconds since the ATLAS SDP epoch at the last data point in the file. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed.");
+        add_attribute(datasets, "long_name", "ATLAS End Time (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "seconds since 2018-01-01");
+        add_attribute(datasets, "standard_name", "time");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_geoseg */
+        add_variable(datasets, "end_geoseg", &granule["end_geoseg"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The ending geolocation segment number associated with the data contained within this granule. ICESat granule geographic regions are further refined by geolocation segments. During the geolocation process, a geolocation segment is created approximately every 20m from the start of the orbit to the end.  The geolocation segments help align the ATLAS strong a weak beams and provide a common segment length for the L2 and higher products. The geolocation segment indices differ slightly from orbit-to-orbit because of the irregular shape of the Earth. The geolocation segment indices on ATL01 and ATL02 are only approximate because beams have not been aligned at the time of their creation.");
+        add_attribute(datasets, "long_name", "Ending Geolocation Segment");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_gpssow */
+        add_variable(datasets, "end_gpssow", &granule["end_gpssow"]); // double
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "GPS seconds-of-week of the last data point in the granule.");
+        add_attribute(datasets, "long_name", "Ending GPS SOW of Granule (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "seconds");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_gpsweek */
+        add_variable(datasets, "end_gpsweek", &granule["end_gpsweek"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "GPS week number of the last data point in the granule.");
+        add_attribute(datasets, "long_name", "Ending GPSWeek of Granule (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "weeks from 1980-01-06");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_orbit */
+        add_variable(datasets, "end_orbit", &granule["orbit_number"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The ending orbit number associated with the data contained within this granule. The orbit number increments each time the spacecraft completes a full orbit of the Earth.");
+        add_attribute(datasets, "long_name", "Ending Orbit Number");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_region */
+        add_variable(datasets, "end_region", last_df->getMetaData("region")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The ending product-specific region number associated with the data contained within this granule. ICESat-2 data products are separated by geographic regions. The data contained within a specific region are the same for ATL01 and ATL02. ATL03 regions differ slightly because of different geolocation segment locations caused by the irregular shape of the Earth. The region indices for other products are completely independent.");
+        add_attribute(datasets, "long_name", "Ending Region");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - end_rgt */
+        add_variable(datasets, "end_rgt", last_df->getMetaData("rgt")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The ending reference groundtrack (RGT) number associated with the data contained within this granule. There are 1387 reference groundtrack in the ICESat-2 repeat orbit. The reference groundtrack increments each time the spacecraft completes a full orbit of the Earth and resets to 1 each time the spacecraft completes a full cycle.");
+        add_attribute(datasets, "long_name", "Ending Reference Groundtrack");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - granule_end_utc */
+        add_variable(datasets, "granule_end_utc", &granule["granule_end_utc"]); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Requested end time (in UTC CCSDS-A) of this granule.");
+        add_attribute(datasets, "long_name", "End UTC Time of Granule (CCSDS-A, Requested)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - granule_start_utc */
+        add_variable(datasets, "granule_start_utc", &granule["granule_start_utc"]); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Requested start time (in UTC CCSDS-A) of this granule.");
+        add_attribute(datasets, "long_name", "Start UTC Time of Granule (CCSDS-A, Requested)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - release */
+        add_variable(datasets, "release", &lua_obj->release); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Release number of the granule. The release number is incremented when the software or ancillary data used to create the granule has been changed.");
+        add_attribute(datasets, "long_name", "Release Number");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - resource */
+        add_variable(datasets, "resource", last_df->getMetaData("granule")); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "ATL03 granule used to produce this granule");
+        add_attribute(datasets, "long_name", "ATL03 Resource");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - sliderule_version */
+        add_variable(datasets, "sliderule_version", &parms->slideruleVersion); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Version of SlideRule software used to generate this granule");
+        add_attribute(datasets, "long_name", "SlideRule Version");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - sliderule_commit */
+        add_variable(datasets, "sliderule_commit", &parms->buildInformation); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Git commit ID (https://github.com/SlideRuleEarth/sliderule.git) of SlideRule software used to generate this granule");
+        add_attribute(datasets, "long_name", "SlideRule Commit");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - sliderule_environment */
+        add_variable(datasets, "sliderule_environment", &parms->environmentVersion); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Git commit ID (https://github.com/SlideRuleEarth/sliderule.git) of SlideRule environment used to generate this granule");
+        add_attribute(datasets, "long_name", "SlideRule Environment");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_cycle */
+        add_variable(datasets, "start_cycle", last_df->getMetaData("cycle")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The starting cycle number associated with the data contained within this granule. The cycle number is the counter of the number of 91-day repeat cycles completed by the mission.");
+        add_attribute(datasets, "long_name", "Starting Cycle");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_delta_time */
+        add_variable(datasets, "start_delta_time", &granule["start_delta_time"]); // double
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Number of GPS seconds since the ATLAS SDP epoch at the first data point in the file. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed.");
+        add_attribute(datasets, "long_name", "ATLAS Start Time (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "seconds since 2018-01-01");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_geoseg */
+        add_variable(datasets, "start_geoseg", &granule["start_geoseg"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The starting geolocation segment number associated with the data contained within this granule. ICESat granule geographic regions are further refined by geolocation segments. During the geolocation process, a geolocation segment is created approximately every 20m from the start of the orbit to the end.  The geolocation segments help align the ATLAS strong a weak beams and provide a common segment length for the L2 and higher products. The geolocation segment indices differ slightly from orbit-to-orbit because of the irregular shape of the Earth. The geolocation segment indices on ATL01 and ATL02 are only approximate because beams have not been aligned at the time of their creation.");
+        add_attribute(datasets, "long_name", "Starting Geolocation Segment");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_gpssow */
+        add_variable(datasets, "start_gpssow", &granule["start_gpssow"]); // double
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "GPS seconds-of-week of the first data point in the granule.");
+        add_attribute(datasets, "long_name", "Start GPS SOW of Granule (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "seconds");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_gpsweek */
+        add_variable(datasets, "start_gpsweek", &granule["start_gpsweek"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "GPS week number of the first data point in the granule.");
+        add_attribute(datasets, "long_name", "Start GPSWeek of Granule (Actual)");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "weeks from 1980-01-06");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_orbit */
+        add_variable(datasets, "start_orbit", &granule["orbit_number"]); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The starting orbit number associated with the data contained within this granule. The orbit number increments each time the spacecraft completes a full orbit of the Earth.");
+        add_attribute(datasets, "long_name", "Starting Orbit Number");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_region */
+        add_variable(datasets, "start_region", last_df->getMetaData("region")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The starting product-specific region number associated with the data contained within this granule. ICESat-2 data products are separated by geographic regions. The data contained within a specific region are the same for ATL01 and ATL02. ATL03 regions differ slightly because of different geolocation segment locations caused by the irregular shape of the Earth. The region indices for other products are completely independent.");
+        add_attribute(datasets, "long_name", "Starting Region");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - start_rgt */
+        add_variable(datasets, "start_rgt", last_df->getMetaData("rgt")); // int32
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "The starting reference groundtrack (RGT) number associated with the data contained within this granule. There are 1387 reference groundtrack in the ICESat-2 repeat orbit. The reference groundtrack increments each time the spacecraft completes a full orbit of the Earth and resets to 1 each time the spacecraft completes a full cycle.");
+        add_attribute(datasets, "long_name", "Starting Reference Groundtrack");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - version */
+        add_variable(datasets, "version", &granule["version"]); // string
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "Version number of this granule within the release. It is a sequential number corresponding to the number of times the granule has been reprocessed for the current release.");
+        add_attribute(datasets, "long_name", "Version");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Go Back to Parent Group */
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /***************************/
+        /* Create Orbit Info Group */
+        /***************************/
+        add_group(datasets, "orbit_info");
+
+        /* Create Variable - crossing_time */
+        add_variable(datasets, "crossing_time", &granule["crossing_time"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "The time, in seconds since the ATLAS SDP GPS Epoch, at which the ascending node crosses the equator. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed.");
+        add_attribute(datasets, "long_name", "Ascending Node Crossing Time");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "seconds since 2018-01-01");
+        add_attribute(datasets, "standard_name", "time");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - cycle_number */
+        add_variable(datasets, "cycle_number", last_df->getMetaData("cycle"));
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "Tracks the number of 91-day cycles in the mission, beginning with 01.  A unique orbit number can be determined by subtracting 1 from the cycle_number, multiplying by 1387 and adding the rgt value.");
+        add_attribute(datasets, "long_name", "Cycle Number");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "counts");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - lan */
+        add_variable(datasets, "lan", &granule["lan"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "Longitude at the ascending node crossing.");
+        add_attribute(datasets, "long_name", "Ascending Node Longitude");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "degrees_east");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - orbit_number */
+        add_variable(datasets, "orbit_number", &granule["orbit_number"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "Unique identifying number for each planned ICESat-2 orbit.");
+        add_attribute(datasets, "long_name", "Orbit Number");
+        add_attribute(datasets, "source", "Operations");
+        add_attribute(datasets, "units", "1");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - rgt */
+        add_variable(datasets, "rgt", last_df->getMetaData("rgt"));
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "The reference ground track (RGT) is the track on the earth at which a specified unit vector within the observatory is pointed. Under nominal operating conditions, there will be no data collected along the RGT, as the RGT is spanned by GT2L and GT2R.  During slews or off-pointing, it is possible that ground tracks may intersect the RGT. The ICESat-2 mission has 1387 RGTs.");
+        add_attribute(datasets, "long_name", "Reference Ground Track");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "counts");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - sc_orient */
+        add_variable(datasets, "sc_orient", &granule["sc_orient"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "This parameter tracks the spacecraft orientation between forward, backward and transitional flight modes. ICESat-2 is considered to be flying forward when the weak beams are leading the strong beams; and backward when the strong beams are leading the weak beams. ICESat-2 is considered to be in transition while it is maneuvering between the two orientations. Science quality is potentially degraded while in transition mode.");
+        add_attribute(datasets, "long_name", "Spacecraft Orientation");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "1");
+        add_attribute(datasets, "flag_meanings", "backward forward transition");
+        add_attribute(datasets, "flag_values", "0, 1, 2");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Create Variable - sc_orient_time */
+        add_variable(datasets, "sc_orient_time", &granule["sc_orient_time"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "The time of the last spacecraft orientation change between forward, backward and transitional flight modes, expressed in seconds since the ATLAS SDP GPS Epoch. ICESat-2 is considered to be flying forward when the weak beams are leading the strong beams; and backward when the strong beams are leading the weak beams. ICESat-2 is considered to be in transition while it is maneuvering between the two orientations. Science quality is potentially degraded while in transition mode. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed.");
+        add_attribute(datasets, "long_name", "Time of Last Spacecraft Orientation Change");
+        add_attribute(datasets, "source", "POD/PPD");
+        add_attribute(datasets, "units", "seconds since 2018-01-01");
+        add_attribute(datasets, "standard_name", "time");
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /* Go Back to Parent Group */
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /*************************/
+        /* Create Metadata Group */
+        /*************************/
+        add_group(datasets, "metadata");
+
+        /* Create Variable - sliderule */
+        add_variable(datasets, "sliderule", &granule["sliderule"]);
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "sliderule server and request information");
+        add_attribute(datasets, "long_name", "SlideRule MetaData");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "json");
+
+        /* Create Variable - sliderule */
+        add_variable(datasets, "profile", &granule["profile"]);
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "runtimes of the various algorithms");
+        add_attribute(datasets, "long_name", "Algorithm RunTimes");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "json");
+
+        /* Create Variable - sliderule */
+        add_variable(datasets, "stats", &granule["stats"]);
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "granule level statistics");
+        add_attribute(datasets, "long_name", "Granule Metrics");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "json");
+
+        /* Create Variable - sliderule */
+        add_variable(datasets, "extent", &granule["extent"]);
+        add_attribute(datasets, "contentType", "auxiliaryInformation");
+        add_attribute(datasets, "description", "geospatial and temporal extents");
+        add_attribute(datasets, "long_name", "Query MetaData");
+        add_attribute(datasets, "source", "Derived");
+        add_attribute(datasets, "units", "json");
+
+        /* Go Back to Parent Group */
+        datasets.add(HdfLib::PARENT_DATASET);
+
+        /*******************/
         /* Write HDF5 File */
+        /*******************/
         status = HdfLib::write(filename, datasets);
     }
     catch(const RunTimeException& e)
