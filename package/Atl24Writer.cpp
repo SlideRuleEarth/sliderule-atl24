@@ -137,7 +137,7 @@ int Atl24Writer::luaCreate (lua_State* L)
         int granule_index = 3;
 
         /* Get Parameters */
-        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, -1, Icesat2Fields::OBJECT_TYPE));
+        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, parms_index, Icesat2Fields::OBJECT_TYPE));
 
         /* Get DataFrames */
         if(lua_istable(L, dataframe_table_index))
@@ -154,7 +154,7 @@ int Atl24Writer::luaCreate (lua_State* L)
         }
 
         /* Get Granule */
-        _granule = dynamic_cast<Atl24Granule*>(getLuaObject(L, -1, Atl24Granule::OBJECT_TYPE));
+        _granule = dynamic_cast<Atl24Granule*>(getLuaObject(L, granule_index, Atl24Granule::OBJECT_TYPE));
 
         /* Return Dispatch Object */
         return createLuaObject(L, new Atl24Writer(L, _parms, _dataframes, _granule));
