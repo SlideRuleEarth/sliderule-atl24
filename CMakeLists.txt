@@ -20,7 +20,7 @@ find_package (Lua "5.3")
 find_package (GDAL)
 
 # Version Information #
-execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR}/../.. --git-dir ${PROJECT_SOURCE_DIR}/../../.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE BUILDINFO)
+execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR} --git-dir ${PROJECT_SOURCE_DIR}/.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE BUILDINFO)
 string(REGEX REPLACE "\n$" "" BUILDINFO "${BUILDINFO}")
 target_compile_definitions (atl24 PUBLIC BUILDINFO="${BUILDINFO}")
 file(STRINGS ${PROJECT_SOURCE_DIR}/version.txt TGTVER)
@@ -56,9 +56,9 @@ target_include_directories (atl24
 
 # Plugin Installation #
 install (
-    TARGETS 
-        atl24 LIBRARY 
-    DESTINATION 
+    TARGETS
+        atl24 LIBRARY
+    DESTINATION
         ${PLUGINDIR}
 )
 install (

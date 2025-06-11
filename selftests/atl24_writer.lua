@@ -3,7 +3,7 @@ local prettyprint = require("prettyprint")
 
 -- Setup --
 
-runner.authenticate()
+runner.authenticate({'nsidc-cloud'})
 
 -- Self Test --
 
@@ -20,8 +20,7 @@ runner.unittest("ATL24 HDF5 Writer", function()
     local gt1l      = icesat2.atl24x("gt1l", parms, atl24h5, "rspq")
     local status    = gt1l:waiton(10000, "rspq")
     runner.assert(status, "failed to create dataframe", true)
-    local df = {gt1l=gt1l}
-    local atl24_file = atl24.hdf5file(parms, df, granule)
+    local atl24_file = atl24.hdf5file(parms, {gt1l=gt1l}, granule)
     runner.assert(atl24_file:write("/tmp/atl24.h5"))
 end)
 
