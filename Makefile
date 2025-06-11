@@ -1,5 +1,7 @@
 ROOT = $(shell pwd)
 BUILD = $(ROOT)/build
+VERSION ?= latest
+BUCKET ?= s3://sliderule/config/
 USERCFG ?=
 
 all: ## build code
@@ -21,6 +23,19 @@ uninstall: ## uninstall most recent install of sliderule from system
 
 prep: ## create necessary build directories
 	mkdir -p $(BUILD)
+
+publish: ## upload plugin to slideruleearth plugin bucket
+	aws s3 cp $(BUILD)/atl24.so $(BUCKET)
+
+tag: ## create version tag in this repository and release it on GitHub
+	echo $(VERSION) > $(ROOT)/version.txt
+	git add $(ROOT)/version.txt
+	git commit -m "Version $(VERSION)"
+	git tag -a $(VERSION) -m "Version $(VERSION)"
+	git push --tags && git push
+	gh release create $(VERSION) -t $(VERSION) --notes "see https://slideruleearth.io for details"
+
+release: distclean tag config-release all publish ## release a version of atl24 plugin; needs VERSION
 
 clean: ## clean last build
 	- make -C $(BUILD) clean
