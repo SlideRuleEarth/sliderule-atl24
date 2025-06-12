@@ -1,6 +1,7 @@
 ROOT = $(shell pwd)
 BUILD = $(ROOT)/build
 VERSION ?= latest
+SLIDERULE ?= $(ROOT)/../sliderule
 BUCKET ?= s3://sliderule/config/
 USERCFG ?=
 
@@ -26,6 +27,10 @@ prep: ## create necessary build directories
 
 publish: ## upload plugin to slideruleearth plugin bucket
 	aws s3 cp $(BUILD)/atl24.so $(BUCKET)
+
+stage:
+	mkdir -p $(SLIDERULE)/stage/sliderule/lib/sliderule/
+	cp $(BUILD)/atl24.so $(SLIDERULE)/stage/sliderule/lib/sliderule/
 
 tag: ## create version tag in this repository and release it on GitHub
 	echo $(VERSION) > $(ROOT)/version.txt

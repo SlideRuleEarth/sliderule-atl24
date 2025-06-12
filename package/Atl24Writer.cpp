@@ -62,6 +62,12 @@ const char* Atl24Writer::BEAMS[NUM_BEAMS] = {"gt1l", "gt1r", "gt2l", "gt2r", "gt
  * LOCAL FUNCTIONS
  ******************************************************************************/
 
+static void goto_parent(List<HdfLib::dataset_t>& datasets)
+{
+    HdfLib::dataset_t parent = {NULL, HdfLib::PARENT, RecordObject::INVALID_FIELD, NULL, 0} ;
+    datasets.add(parent);
+}
+
 static void add_group(List<HdfLib::dataset_t>& datasets, const char* name)
 {
     HdfLib::dataset_t group = {name, HdfLib::GROUP, RecordObject::INVALID_FIELD, NULL, 0} ;
@@ -260,7 +266,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon classification");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - confidence */
             add_variable(datasets, "confidence", &df->confidence);
@@ -270,7 +276,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Ensemble confidence");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - time_ns */
             FieldColumn<int64_t> delta_time;
@@ -287,7 +293,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Elapsed GPS seconds");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "seconds since 2018-01-01");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - ellipse_h */
             add_variable(datasets, "ellipse_h", &df->ellipse_h);
@@ -297,7 +303,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon WGS84 height");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - index_ph */
             FieldColumn<int32_t>* index_ph = dynamic_cast<FieldColumn<int32_t>*>(df->getColumn("index_ph"));
@@ -308,7 +314,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon index");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - index_seg */
             FieldColumn<int32_t>* index_seg = dynamic_cast<FieldColumn<int32_t>*>(df->getColumn("index_seg"));
@@ -319,7 +325,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Segment index");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - invalid_kd */
             add_variable(datasets, "invalid_kd", &df->invalid_kd);
@@ -329,7 +335,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Invalid Kd");
             add_attribute(datasets, "source", "VIIRS Kd490");
             add_attribute(datasets, "units", "boolean");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - invalid_wind_speed */
             add_variable(datasets, "invalid_wind_speed", &df->invalid_wind_speed);
@@ -339,7 +345,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Invalid wind speed");
             add_attribute(datasets, "source", "ATL09");
             add_attribute(datasets, "units", "boolean");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - lat_ph */
             add_variable(datasets, "lat_ph", &df->lat_ph);
@@ -352,7 +358,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "standard_name", "latitude");
             add_attribute_double(datasets, "valid_max", 90.0);
             add_attribute_double(datasets, "valid_min", -90.0);
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - lon_ph */
             add_variable(datasets, "lon_ph", &df->lon_ph);
@@ -365,7 +371,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "standard_name", "longitude");
             add_attribute_double(datasets, "valid_max", 180.0);
             add_attribute_double(datasets, "valid_min", -180.0);
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - low_confidence_flag */
             add_variable(datasets, "low_confidence_flag", &df->low_confidence_flag);
@@ -375,7 +381,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Low confidence bathymetry flag");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - night_flag */
             add_variable(datasets, "night_flag", &df->night_flag);
@@ -385,7 +391,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Night flag");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - ortho_h */
             add_variable(datasets, "ortho_h", &df->ortho_h);
@@ -395,7 +401,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Orthometric height");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - sensor_depth_exceeded */
             add_variable(datasets, "sensor_depth_exceeded", &df->sensor_depth_exceeded);
@@ -405,7 +411,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Sensor depth exceeded");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - sigma_thu */
             add_variable(datasets, "sigma_thu", &df->sigma_thu);
@@ -415,7 +421,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Total horizontal uncertainty");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - sigma_tvu */
             add_variable(datasets, "sigma_tvu", &df->sigma_tvu);
@@ -425,7 +431,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Total vertical uncertainty");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - surface_h */
             add_variable(datasets, "surface_h", &df->surface_h);
@@ -435,7 +441,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Sea surface orthometric height");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - x_atc */
             add_variable(datasets, "x_atc", &df->x_atc);
@@ -445,7 +451,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Distance from equator crossing");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Create Variable - y_atc */
             add_variable(datasets, "y_atc", &df->y_atc);
@@ -455,10 +461,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Distance off RGT");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
 
             /* Go Back to Parent Group */
-            datasets.add(HdfLib::PARENT_DATASET);
+            goto_parent(datasets);
         }
 
         /* Check For At Least One Beam */
@@ -476,7 +482,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "ATLAS Epoch Offset");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "seconds since 1980-01-06T00:00:00.000000Z");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - data_end_utc */
         add_scalar(datasets, "data_end_utc", &granule["data_start_utc"]);
@@ -485,7 +491,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "End UTC Time of Granule (CCSDS-A, Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - data_start_utc */
         add_scalar(datasets, "data_start_utc", &granule["data_start_utc"]);
@@ -494,7 +500,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Start UTC Time of Granule (CCSDS-A, Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_cycle */
         add_scalar(datasets, "end_cycle", last_df->getMetaData("cycle"));
@@ -503,7 +509,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending Cycle");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_delta_time */
         add_scalar(datasets, "end_delta_time", &granule["end_delta_time"]);
@@ -513,7 +519,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "seconds since 2018-01-01");
         add_attribute(datasets, "standard_name", "time");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_geoseg */
         add_scalar(datasets, "end_geoseg", &granule["end_geoseg"]);
@@ -522,7 +528,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending Geolocation Segment");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_gpssow */
         add_scalar(datasets, "end_gpssow", &granule["end_gpssow"]);
@@ -531,7 +537,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending GPS SOW of Granule (Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "seconds");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_gpsweek */
         add_scalar(datasets, "end_gpsweek", &granule["end_gpsweek"]);
@@ -540,7 +546,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending GPSWeek of Granule (Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "weeks from 1980-01-06");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_orbit */
         add_scalar(datasets, "end_orbit", &granule["orbit_number"]);
@@ -549,7 +555,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending Orbit Number");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_region */
         add_scalar(datasets, "end_region", last_df->getMetaData("region"));
@@ -558,7 +564,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending Region");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - end_rgt */
         add_scalar(datasets, "end_rgt", last_df->getMetaData("rgt"));
@@ -567,7 +573,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ending Reference Groundtrack");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - granule_end_utc */
         add_scalar(datasets, "granule_end_utc", &granule["granule_end_utc"]);
@@ -576,7 +582,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "End UTC Time of Granule (CCSDS-A, Requested)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - granule_start_utc */
         add_scalar(datasets, "granule_start_utc", &granule["granule_start_utc"]);
@@ -585,7 +591,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Start UTC Time of Granule (CCSDS-A, Requested)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - release */
         add_scalar(datasets, "release", &lua_obj->release);
@@ -594,7 +600,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Release Number");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - resource */
         add_scalar(datasets, "resource", last_df->getMetaData("granule"));
@@ -603,7 +609,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "ATL03 Resource");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule_version */
         add_scalar(datasets, "sliderule_version", &parms->slideruleVersion);
@@ -612,7 +618,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "SlideRule Version");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule_commit */
         add_scalar(datasets, "sliderule_commit", &parms->buildInformation);
@@ -621,7 +627,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "SlideRule Commit");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule_environment */
         add_scalar(datasets, "sliderule_environment", &parms->environmentVersion);
@@ -630,7 +636,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "SlideRule Environment");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_cycle */
         add_scalar(datasets, "start_cycle", last_df->getMetaData("cycle"));
@@ -639,7 +645,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Starting Cycle");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_delta_time */
         add_scalar(datasets, "start_delta_time", &granule["start_delta_time"]);
@@ -648,7 +654,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "ATLAS Start Time (Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "seconds since 2018-01-01");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_geoseg */
         add_scalar(datasets, "start_geoseg", &granule["start_geoseg"]);
@@ -657,7 +663,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Starting Geolocation Segment");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_gpssow */
         add_scalar(datasets, "start_gpssow", &granule["start_gpssow"]);
@@ -666,7 +672,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Start GPS SOW of Granule (Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "seconds");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_gpsweek */
         add_scalar(datasets, "start_gpsweek", &granule["start_gpsweek"]);
@@ -675,7 +681,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Start GPSWeek of Granule (Actual)");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "weeks from 1980-01-06");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_orbit */
         add_scalar(datasets, "start_orbit", &granule["orbit_number"]);
@@ -684,7 +690,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Starting Orbit Number");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_region */
         add_scalar(datasets, "start_region", last_df->getMetaData("region"));
@@ -693,7 +699,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Starting Region");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - start_rgt */
         add_scalar(datasets, "start_rgt", last_df->getMetaData("rgt"));
@@ -702,7 +708,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Starting Reference Groundtrack");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - version */
         add_scalar(datasets, "version", &granule["version"]);
@@ -711,10 +717,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Version");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Go Back to Parent Group */
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /***************************/
         /* Create Orbit Info Group */
@@ -729,7 +735,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "seconds since 2018-01-01");
         add_attribute(datasets, "standard_name", "time");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - cycle_number */
         add_scalar(datasets, "cycle_number", last_df->getMetaData("cycle"));
@@ -738,7 +744,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Cycle Number");
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "counts");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - lan */
         add_scalar(datasets, "lan", &granule["lan"]);
@@ -747,7 +753,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Ascending Node Longitude");
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "degrees_east");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - orbit_number */
         add_scalar(datasets, "orbit_number", &granule["orbit_number"]);
@@ -756,7 +762,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Orbit Number");
         add_attribute(datasets, "source", "Operations");
         add_attribute(datasets, "units", "1");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - rgt */
         add_scalar(datasets, "rgt", last_df->getMetaData("rgt"));
@@ -765,7 +771,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Reference Ground Track");
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "counts");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sc_orient */
         add_scalar(datasets, "sc_orient", &granule["sc_orient"]);
@@ -776,7 +782,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "units", "1");
         add_attribute(datasets, "flag_meanings", "backward forward transition");
         add_attribute(datasets, "flag_values", "0, 1, 2");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sc_orient_time */
         add_scalar(datasets, "sc_orient_time", &granule["sc_orient_time"]);
@@ -786,10 +792,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "seconds since 2018-01-01");
         add_attribute(datasets, "standard_name", "time");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Go Back to Parent Group */
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /*************************/
         /* Create Metadata Group */
@@ -803,7 +809,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "SlideRule MetaData");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule */
         add_scalar(datasets, "profile", &granule["profile"]);
@@ -812,7 +818,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Algorithm RunTimes");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule */
         add_scalar(datasets, "stats", &granule["stats"]);
@@ -821,7 +827,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Granule Metrics");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Create Variable - sliderule */
         add_scalar(datasets, "extent", &granule["extent"]);
@@ -830,10 +836,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Query MetaData");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /* Go Back to Parent Group */
-        datasets.add(HdfLib::PARENT_DATASET);
+        goto_parent(datasets);
 
         /*******************/
         /* Write HDF5 File */
