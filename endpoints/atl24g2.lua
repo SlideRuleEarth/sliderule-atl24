@@ -24,7 +24,9 @@ for _, beam in ipairs(parms["beams"]) do
 end
 
 -- add frame runners to dataframes
+local blunder = atl24.blunder(parms)
 for beam, df in pairs(dataframes) do
+    df:run(blunder)
     df:run(core.TERMINATE)
 end
 

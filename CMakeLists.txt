@@ -43,6 +43,7 @@ target_sources(atl24
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
 )
 
 # Include Directories #
@@ -66,11 +67,4 @@ install (
         ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24g2.lua
     DESTINATION
         ${CONFDIR}/api
-)
-install (
-    FILES
-        ${CMAKE_CURRENT_LIST_DIR}/package/atl24.h
-        ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.h
-    DESTINATION
-        ${INCLUDEDIR}/atl24
 )

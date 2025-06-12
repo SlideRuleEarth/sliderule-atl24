@@ -5,8 +5,8 @@ from sliderule import sliderule
 import h5py
 import os
 
-class TestAtl24:
-    def test_atl24g2(self, init):
+class TestAtl24g2:
+    def test_nominal(self, init):
         resource = "ATL24_20241107234251_08052501_006_01_001_01.h5"
         output_path = "/tmp/atl24.h5"
         parms = {
@@ -28,4 +28,10 @@ class TestAtl24:
         for key in ['class_ph', 'confidence', 'ellipse_h', 'index_ph', 'index_seg', 'invalid_kd', 'invalid_wind_speed', 'lat_ph', 'lon_ph', 'low_confidence_flag', 'night_flag', 'ortho_h', 'sensor_depth_exceeded', 'sigma_thu', 'sigma_tvu', 'surface_h', 'time_ns', 'x_atc', 'y_atc']:
             assert key in h5f["gt1l"]
         assert sum(h5f["gt1l"]["night_flag"]) == 188588
+        bathy_cnt = 0
+        for c in h5f["gt1l"]["class_ph"]:
+            if c == 40:
+                bathy_cnt += 1
+        assert sum(h5f["gt1l"]["low_confidence_flag"]) == 12
+        assert bathy_cnt == (99 - sum(h5f["gt1l"]["low_confidence_flag"]))
         os.remove(filename)
