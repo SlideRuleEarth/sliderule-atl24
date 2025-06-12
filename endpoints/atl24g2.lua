@@ -66,4 +66,4 @@ local atl24_file = atl24.hdf5file(parms, dataframes, granule)
 atl24_file:write(tmp_filename)
 
 -- send new atl24 releas 02 granule to user
-arrow.send2user(tmp_filename, parms, rspq)
+core.send2user(tmp_filename, parms, rspq)
