@@ -34,7 +34,7 @@
  ******************************************************************************/
 
 #include "LuaEngine.h"
-#include "icesat2/Icesat2Fields.h"
+#include "Icesat2Fields.h"
 
 #include "Atl24Writer.h"
 

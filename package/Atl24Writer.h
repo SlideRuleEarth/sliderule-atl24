@@ -41,9 +41,9 @@
 #include "LuaObject.h"
 #include "HdfLib.h"
 #include "FieldElement.h"
-#include "icesat2/Icesat2Fields.h"
-#include "icesat2/Atl24DataFrame.h"
-#include "icesat2/Atl24Granule.h"
+#include "Icesat2Fields.h"
+#include "Atl24DataFrame.h"
+#include "Atl24Granule.h"
 
 /******************************************************************************
  * CLASS DECLARATION

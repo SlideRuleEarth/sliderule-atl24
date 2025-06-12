@@ -10,11 +10,15 @@ all: ## build code
 
 config: prep ## configure make for debug version of sliderule
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Debug $(USERCFG) $(ROOT)
 
 config-release: prep ## configure make for release version of sliderule
 	cd $(BUILD) && \
 	cmake -DCMAKE_BUILD_TYPE=Release $(USERCFG) $(ROOT)
+
+config-stage: prep ## configure make to stage plugin with a local install of sliderule
+	cd $(BUILD) && \
+	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule $(USERCFG) $(ROOT)
 
 install: ## install sliderule to system
 	make -C $(BUILD) install
@@ -27,10 +31,6 @@ prep: ## create necessary build directories
 
 publish: ## upload plugin to slideruleearth plugin bucket
 	aws s3 cp $(BUILD)/atl24.so $(BUCKET)
-
-stage:
-	mkdir -p $(SLIDERULE)/stage/sliderule/lib/sliderule/
-	cp $(BUILD)/atl24.so $(SLIDERULE)/stage/sliderule/lib/sliderule/
 
 tag: ## create version tag in this repository and release it on GitHub
 	echo $(VERSION) > $(ROOT)/version.txt

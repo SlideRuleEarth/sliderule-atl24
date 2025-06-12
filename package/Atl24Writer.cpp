@@ -40,8 +40,8 @@
 #include "GeoDataFrame.h"
 #include "FieldColumn.h"
 #include "TimeLib.h"
-#include "icesat2/Atl24DataFrame.h"
-#include "icesat2/Icesat2Fields.h"
+#include "Atl24DataFrame.h"
+#include "Icesat2Fields.h"
 
 /******************************************************************************
  * STATIC DATA
