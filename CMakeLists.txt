@@ -2,6 +2,10 @@
 cmake_minimum_required (VERSION 3.13.0) # The minimum CMake version is chosen to enable policy CMP0079
 project (ATL24 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 23)
+#set(CMAKE_CXX_FLAGS "-Wall -Werror -Wshadow ${CMAKE_CXX_FLAGS}")
+
 # Squelch a warning when building on Win32/Cygwin
 set (CMAKE_LEGACY_CYGWIN_WIN32 0)
 
@@ -17,7 +21,6 @@ set_target_properties (atl24 PROPERTIES PREFIX "")
 
 # Prerequisites #
 find_package (Lua "5.3")
-find_package (GDAL)
 
 # Version Information #
 execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR} --git-dir ${PROJECT_SOURCE_DIR}/.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE BUILDINFO)
@@ -28,14 +31,13 @@ target_compile_definitions (atl24 PUBLIC BINID="${TGTVER}")
 
 # Set Environment Variables #
 set (INSTALLDIR /usr/local CACHE STRING "Installation directory for library and executables")
-set (INCLUDEDIR ${INSTALLDIR}/include)
 set (CONFDIR ${INSTALLDIR}/etc/sliderule)
 set (PLUGINDIR ${INSTALLDIR}/lib/sliderule)
+set (ATL24DIR ${INSTALLDIR} CACHE STRING "Location of ATL24 algorithm header-only library")
 
 # Debug Configuration #
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
 	target_compile_options (atl24 PUBLIC -fsanitize=address -fno-omit-frame-pointer)
-	target_link_options (atl24 PUBLIC -fsanitize=address)
 endif()
 
 # Source Files #
@@ -50,8 +52,8 @@ target_sources(atl24
 target_include_directories (atl24
     PUBLIC
         ${INSTALLDIR}/include/sliderule
+        ${ATL24DIR}/include
         ${LUA_INCLUDE_DIR}
-        ${GDAL_INCLUDE_DIR}
         $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/package
 )
 

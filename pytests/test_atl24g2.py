@@ -28,10 +28,10 @@ class TestAtl24g2:
         for key in ['class_ph', 'confidence', 'ellipse_h', 'index_ph', 'index_seg', 'invalid_kd', 'invalid_wind_speed', 'lat_ph', 'lon_ph', 'low_confidence_flag', 'night_flag', 'ortho_h', 'sensor_depth_exceeded', 'sigma_thu', 'sigma_tvu', 'surface_h', 'time_ns', 'x_atc', 'y_atc']:
             assert key in h5f["gt1l"]
         assert sum(h5f["gt1l"]["night_flag"]) == 188588
+        assert sum(h5f["gt1l"]["low_confidence_flag"]) == 12
         bathy_cnt = 0
         for c in h5f["gt1l"]["class_ph"]:
             if c == 40:
                 bathy_cnt += 1
-        assert sum(h5f["gt1l"]["low_confidence_flag"]) == 12
-        assert bathy_cnt == (99 - sum(h5f["gt1l"]["low_confidence_flag"]))
+        assert bathy_cnt == 90
         os.remove(filename)

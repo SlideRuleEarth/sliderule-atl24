@@ -108,6 +108,7 @@ static void add_attribute_double(List<HdfLib::dataset_t>& datasets, const char* 
     datasets.add(attribute);
 }
 
+#if 0
 static void add_attribute_int32(List<HdfLib::dataset_t>& datasets, const char* name, const int32_t value)
 {
     int32_t* buffer = new int32_t[1];
@@ -123,6 +124,7 @@ static void add_attribute_int8(List<HdfLib::dataset_t>& datasets, const char* na
     HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::INT32, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
     datasets.add(attribute);
 }
+#endif
 
 /******************************************************************************
  * METHODS
@@ -252,7 +254,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         {
             /* Get and Check DataFrame for Beam */
             Atl24DataFrame* df = lua_obj->dataframes[i];
-            if(!df) continue;
+            if(!df || df->class_ph.length() <= 0) continue;
             last_df = df;
 
             /* Create Beam Group */
@@ -280,10 +282,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
 
             /* Create Variable - time_ns */
             FieldColumn<int64_t> delta_time;
-            for(long i = 0; i < df->time_ns.length(); i++)
+            for(long j = 0; j < df->time_ns.length(); j++)
             {
                 static const int64_t ATLAS_LEAP_SECONDS = 18; // optimization based on the time period of ATLAS data at the time of ATL24 generation (2025)
-                int64_t value = (df->time_ns[i].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
+                int64_t value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
                 delta_time.append(value);
             }
             add_variable(datasets, "time_ns", &delta_time);

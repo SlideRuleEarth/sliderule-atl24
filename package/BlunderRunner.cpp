@@ -36,11 +36,16 @@
 #include <math.h>
 #include <float.h>
 
+#include "cleanup.h" // ATL24
+
 #include "OsApi.h"
 #include "GeoLib.h"
 #include "BlunderRunner.h"
 #include "Icesat2Fields.h"
 #include "Atl24DataFrame.h"
+
+using namespace ATL24::cleanup;
+using namespace ATL24::photon;
 
 /******************************************************************************
  * DATA
@@ -97,22 +102,51 @@ BlunderRunner::~BlunderRunner (void)
  *----------------------------------------------------------------------------*/
 bool BlunderRunner::run (GeoDataFrame* dataframe)
 {
+    bool status = true;
+
     // latch start of execution time
     const double start = TimeLib::latchtime();
 
     // cast dataframe to ATL24 specific dataframe
     Atl24DataFrame& df = *dynamic_cast<Atl24DataFrame*>(dataframe);
 
-    // change all photons classified as bathymentry with low confidence to unclassified
-    for(long i = 0; i < df.length(); i++)
+    // convert dataframe to input structure of ATL24 v2 cleanup algorithm
+    vector<photon> p(df.length());
+    for(size_t i = 0; i < static_cast<size_t>(df.length()); ++i)
     {
-        if(df.low_confidence_flag[i])
+        // only the below members of the structure are used
+        p[i].x_atc = df.x_atc[i];
+        p[i].h_ph = df.ortho_h[i];
+        p[i].class_ph = df.class_ph[i];
+    }
+
+    // execute ATL24 v2 cleanup algorithm
+    params params;
+    const vector<size_t> q = cleanup(p, params);
+    for(size_t i: q)
+    {
+        // check valid photon
+        if(i >= static_cast<size_t>(df.length()))
         {
-            df.class_ph[i] = Atl24Fields::UNCLASSIFIED;
+            mlog(CRITICAL, "Attempting to cleanup photon that does not exist: %ld >= %ld", i, df.length());
+            status = false;
+            break;
         }
+
+        //check only bathy photons should have changed
+        if(df.class_ph[i] != Atl24Fields::BATHYMETRY)
+        {
+            mlog(CRITICAL, "Attempting to cleanup photon that is not labelled bathymetry: [%ld] => %d", i, df.class_ph[i]);
+            status = false;
+            break;
+        }
+
+        // change classification
+        df.class_ph[i] = Atl24Fields::UNCLASSIFIED;
+        df.low_confidence_flag[i] = 0;
     }
 
     // update runtime and return success
     updateRunTime(TimeLib::latchtime() - start);
-    return true;
+    return status;
 }

@@ -2,23 +2,24 @@ ROOT = $(shell pwd)
 BUILD = $(ROOT)/build
 VERSION ?= latest
 SLIDERULE ?= $(ROOT)/../sliderule
+ATL24 ?= $(ROOT)/../atl24_v2_algorithms
 BUCKET ?= s3://sliderule/config/
 USERCFG ?=
 
 all: ## build code
 	make -j8 -C $(BUILD)
 
-config: prep ## configure make for debug version of sliderule
+config: prep ## configure make for release version of sliderule
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Debug $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Release -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
-config-release: prep ## configure make for release version of sliderule
+config-stage-debug: prep ## configure make to stage debug version of plugin with a local install of sliderule
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Debug -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
-config-stage: prep ## configure make to stage plugin with a local install of sliderule
+config-stage-release: prep ## configure make to stage release version of plugin with a local install of sliderule
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
 install: ## install sliderule to system
 	make -C $(BUILD) install
