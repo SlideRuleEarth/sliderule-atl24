@@ -54,6 +54,16 @@ for test in tests_to_run:
     expected_df = pd.read_csv(expected_results_file).rename(columns={"X_ATC": "x_atc"})
     print(f'{len(expected_df)} photons... ', end='')
 
+    # read expected summary file
+    expected_summary_file = f'{args.after_dir}/{resource[:-3]}_{beam}.txt'
+    expected_relabeled = 0
+    with open(expected_summary_file, "r") as file:
+        for line in file.readlines():
+            line = line.strip()
+            if line.endswith("relabeled"):
+                tokens = line.split(' ')
+                expected_relabeled = int(tokens[0])
+
     # build parameters of request
     parms = {
         "resource":resource,
@@ -68,6 +78,7 @@ for test in tests_to_run:
     rsps = sliderule.source("atl24g2", {"parms": parms}, stream=True)
     resultfile = sliderule.procoutputfile(parms, rsps)
     h5f = h5py.File(resultfile)
+    relabeled = int(h5f[beam]["class_ph"].attrs["relabeled"])
     actual_results = {
         "x_atc": h5f[beam]["x_atc"][:],
         "ortho_h": h5f[beam]["ortho_h"][:],
@@ -89,9 +100,11 @@ for test in tests_to_run:
         print(f'FAIL (there were {len(x_atc_mask) - np.count_nonzero(x_atc_mask)} meaningful x_atc differences)')
     elif False in ortho_h_mask:
         print(f'FAIL (there were {len(ortho_h_mask) - np.count_nonzero(ortho_h_mask)} meaningful ortho_h differences)')
+    elif relabeled != expected_relabeled:
+        print(f'FAIL (unexpected number of photons relabled, {relabeled} != {expected_relabeled})')
     else:
         number_of_passed_tests += 1
-        print(f'pass')
+        print(f'pass ({relabeled} relabeled)')
 
     # clean up
     os.remove(parms["output"]["path"])

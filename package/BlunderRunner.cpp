@@ -40,6 +40,7 @@
 
 #include "OsApi.h"
 #include "GeoLib.h"
+#include "FieldElement.h"
 #include "BlunderRunner.h"
 #include "Icesat2Fields.h"
 #include "Atl24DataFrame.h"
@@ -144,6 +145,14 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
         // change classification
         df.class_ph[i] = Atl24Fields::UNCLASSIFIED;
         df.low_confidence_flag[i] = 0;
+    }
+
+    // add metadata to dataframe
+    FieldElement<int64_t>* relabeled = new FieldElement<int64_t>(q.size());
+    if(!df.addMetaData("relabeled", relabeled, true))
+    {
+        mlog(CRITICAL, "Failed to add metadata to dataframe");
+        delete relabeled;
     }
 
     // update runtime and return success

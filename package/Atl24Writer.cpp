@@ -268,6 +268,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon classification");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
+            add_attribute(datasets, "relabeled", df->getMetaData("relabeled")->toJson().c_str());
             goto_parent(datasets);
 
             /* Create Variable - confidence */
@@ -813,7 +814,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);
 
-        /* Create Variable - sliderule */
+        /* Create Variable - profile */
         add_scalar(datasets, "profile", &granule["profile"]);
         add_attribute(datasets, "contentType", "auxiliaryInformation");
         add_attribute(datasets, "description", "runtimes of the various algorithms");
@@ -822,7 +823,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);
 
-        /* Create Variable - sliderule */
+        /* Create Variable - stats */
         add_scalar(datasets, "stats", &granule["stats"]);
         add_attribute(datasets, "contentType", "auxiliaryInformation");
         add_attribute(datasets, "description", "granule level statistics");
@@ -831,7 +832,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);
 
-        /* Create Variable - sliderule */
+        /* Create Variable - extent */
         add_scalar(datasets, "extent", &granule["extent"]);
         add_attribute(datasets, "contentType", "auxiliaryInformation");
         add_attribute(datasets, "description", "geospatial and temporal extents");
