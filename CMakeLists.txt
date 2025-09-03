@@ -32,7 +32,6 @@ target_compile_definitions (atl24 PUBLIC BINID="${TGTVER}")
 # Set Environment Variables #
 set (INSTALLDIR /usr/local CACHE STRING "Installation directory for library and executables")
 set (CONFDIR ${INSTALLDIR}/etc/sliderule)
-set (PLUGINDIR ${INSTALLDIR}/lib/sliderule)
 set (ATL24DIR ${INSTALLDIR} CACHE STRING "Location of ATL24 algorithm header-only library")
 
 # Debug Configuration #
@@ -62,7 +61,7 @@ install (
     TARGETS
         atl24 LIBRARY
     DESTINATION
-        ${PLUGINDIR}
+        ${CONFDIR}
 )
 install (
     FILES

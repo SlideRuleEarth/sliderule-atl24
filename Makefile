@@ -3,7 +3,7 @@ BUILD = $(ROOT)/build
 VERSION ?= latest
 SLIDERULE ?= $(ROOT)/../sliderule
 ATL24 ?= $(ROOT)/../atl24_v2_algorithms
-BUCKET ?= s3://sliderule/config/
+BUCKET ?= s3://sliderule
 USERCFG ?=
 
 all: ## build code
@@ -31,7 +31,8 @@ prep: ## create necessary build directories
 	mkdir -p $(BUILD)
 
 publish: ## upload plugin to slideruleearth plugin bucket
-	aws s3 cp $(BUILD)/atl24.so $(BUCKET)
+	aws s3 cp $(BUILD)/atl24.so $(BUCKET)/plugins/
+	aws s3 cp endpoints/atl24g2.lua $(BUCKET)/plugins/api/
 
 tag: ## create version tag in this repository and release it on GitHub
 	echo $(VERSION) > $(ROOT)/version.txt

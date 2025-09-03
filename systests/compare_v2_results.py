@@ -78,7 +78,7 @@ for test in tests_to_run:
     rsps = sliderule.source("atl24g2", {"parms": parms}, stream=True)
     resultfile = sliderule.procoutputfile(parms, rsps)
     h5f = h5py.File(resultfile)
-    relabeled = int(h5f[beam]["class_ph"].attrs["relabeled"])
+#    relabeled = int(h5f[beam]["class_ph"].attrs["relabeled"])
     actual_results = {
         "x_atc": h5f[beam]["x_atc"][:],
         "ortho_h": h5f[beam]["ortho_h"][:],
@@ -100,11 +100,11 @@ for test in tests_to_run:
         print(f'FAIL (there were {len(x_atc_mask) - np.count_nonzero(x_atc_mask)} meaningful x_atc differences)')
     elif False in ortho_h_mask:
         print(f'FAIL (there were {len(ortho_h_mask) - np.count_nonzero(ortho_h_mask)} meaningful ortho_h differences)')
-    elif relabeled != expected_relabeled:
-        print(f'FAIL (unexpected number of photons relabled, {relabeled} != {expected_relabeled})')
+#    elif relabeled != expected_relabeled:
+#        print(f'FAIL (unexpected number of photons relabled, {relabeled} != {expected_relabeled})')
     else:
         number_of_passed_tests += 1
-        print(f'pass ({relabeled} relabeled)')
+        print(f'pass')
 
     # clean up
     os.remove(parms["output"]["path"])

@@ -268,7 +268,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon classification");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-            add_attribute(datasets, "relabeled", df->getMetaData("relabeled")->toJson().c_str());
+//            add_attribute(datasets, "relabeled", df->getMetaData("relabeled")->toJson().c_str());
             goto_parent(datasets);
 
             /* Create Variable - confidence */
