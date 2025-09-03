@@ -157,17 +157,8 @@ def worker(worker_id):
             attempts -= 1
             try:
                 log.info(f'<{worker_id}> processing granule {granule} ...')
-                # Parameters of Request
                 parms = {
-                    "asset": "icesat2",
                     "resource": granule,
-                    "atl09_asset": "icesat2",
-                    "srt": icesat2.SRT_DYNAMIC,
-                    "cnf": "atl03_not_considered",
-                    "pass_invalid": True,
-                    "use_bathy_mask": True,
-                    "timeout": 600, # 10 minutes
-                    "classifiers": ["qtrees", "coastnet", "medianfilter", "cshelph", "bathypathfinder", "openoceanspp", "ensemble"],
                     "output": {
                         "asset": "sliderule-stage",
                         "path": granule[:-10] + "_" + RELEASE + "_" + VERSION + ".h5",
@@ -176,7 +167,6 @@ def worker(worker_id):
                         "with_checksum": False,
                     }
                 }
-                # Issue Request
                 rsps = sliderule.source("atl24g2", {"parms": parms}, stream=True)
                 outfile = sliderule.procoutputfile(parms, rsps)
                 log.info(f'<{worker_id}> finished granule {outfile}')
