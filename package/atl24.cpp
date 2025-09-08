@@ -82,7 +82,7 @@ void initatl24 (void)
     LuaEngine::indicate(LUA_ATL24_LIBNAME, LIBID);
 
     /* Display Status */
-    print2term("%s package initialized (%s)\n", LUA_ATL24_LIBNAME, LIBID);
+    print2term("%s package initialized (library=%s, plugin=%s)\n", LUA_ATL24_LIBNAME, LIBID, BINID);
 }
 
 void deinitatl24 (void)

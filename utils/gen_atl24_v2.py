@@ -68,7 +68,7 @@ bucket = path.split("/")[0]
 subfolder = '/'.join(path.split("/")[1:])
 
 # Get List of Granules from S3 Bucket
-granules = []
+existing_granules = []
 is_truncated = True
 continuation_token = None
 while is_truncated:
@@ -85,31 +85,30 @@ while is_truncated:
         for obj in response['Contents']:
             resource = obj['Key'].split("/")[-1]
             if resource.startswith("ATL24") and resource.endswith(".h5"):
-                granules.append(resource)
+                existing_granules.append(resource.replace(RELEASE + "_" + VERSION + ".h5", "001_01.h5"))
     # check if more data is available
     is_truncated = response['IsTruncated']
     continuation_token = response.get('NextContinuationToken')
 print('') # new line
 
 # Open and Read Input File (containing list of granules to process)
-rqsts = []
-already_processed = 0
+granules_to_process = []
+granules_already_processed = []
 for input_file in list_of_input_files:
     with open(input_file, "r") as file:
         for line in file.readlines():
             granule = line.strip()
-            if granule not in granules:
-                rqsts.append(granule)
+            if granule in existing_granules:
+                granules_already_processed.append(granule)
             else:
-                already_processed += 1
+                granules_to_process.append(granule)
 
 # Display Parameters
-print(f'Existing Granules:           {len(granules)}')
-print(f'Granules Already Processed   {already_processed}')
-print(f'Granules Left to Process:    {len(rqsts)}')
+print(f'Granules Already Processed   {len(granules_already_processed)}')
+print(f'Granules Left to Process:    {len(granules_to_process)}')
 
 # Queue Processing Requests
-for granule in rqsts:
+for granule in granules_to_process:
     if "#" not in granule:
         rqst_q.put(granule)
 
