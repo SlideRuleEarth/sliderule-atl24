@@ -57,7 +57,7 @@ for beam, df in pairs(dataframes) do
 end
 
 -- wait for granule
- if not granule:waiton(ctimeout(), _rqst.rspq) then
+if not granule:waiton(ctimeout(), _rqst.rspq) then
     userlog:alert(core.ERROR, core.RTE_TIMEOUT, string.format("request <%s> timed out waiting for granule to complete on %s", _rqst.id, parms["resource"]))
     return
 end
