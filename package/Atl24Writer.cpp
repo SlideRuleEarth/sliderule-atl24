@@ -34,6 +34,7 @@
  ******************************************************************************/
 
 #include "Atl24Writer.h"
+#include "PluginFields.h"
 #include "OsApi.h"
 #include "EventLib.h"
 #include "List.h"
@@ -245,6 +246,10 @@ int Atl24Writer::luaWriteFile(lua_State* L)
 
         /* Get Filename */
         const char* filename = getLuaString(L, 2);
+
+        /* Get Plugin Metadata */
+        PluginFields pluginFields;
+        FieldElement<string> atl24_metadata(pluginFields.toJson());
 
         /**********************/
         /* Create Beam Groups */
@@ -814,20 +819,11 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);
 
-        /* Create Variable - profile */
-        add_scalar(datasets, "profile", &granule["profile"]);
+        /* Create Variable - atl24 */
+        add_scalar(datasets, "atl24", &atl24_metadata);
         add_attribute(datasets, "contentType", "auxiliaryInformation");
-        add_attribute(datasets, "description", "runtimes of the various algorithms");
-        add_attribute(datasets, "long_name", "Algorithm RunTimes");
-        add_attribute(datasets, "source", "Derived");
-        add_attribute(datasets, "units", "json");
-        goto_parent(datasets);
-
-        /* Create Variable - stats */
-        add_scalar(datasets, "stats", &granule["stats"]);
-        add_attribute(datasets, "contentType", "auxiliaryInformation");
-        add_attribute(datasets, "description", "granule level statistics");
-        add_attribute(datasets, "long_name", "Granule Metrics");
+        add_attribute(datasets, "description", "atl24 algorithm versioning and build information");
+        add_attribute(datasets, "long_name", "ATL24 MetaData");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);

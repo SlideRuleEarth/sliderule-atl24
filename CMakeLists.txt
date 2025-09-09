@@ -29,6 +29,11 @@ target_compile_definitions (atl24 PUBLIC BUILDINFO="${BUILDINFO}")
 file(STRINGS ${PROJECT_SOURCE_DIR}/version.txt TGTVER)
 target_compile_definitions (atl24 PUBLIC BINID="${TGTVER}")
 
+# Algorithm Version Information #
+execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR}/../atl24_v2_algorithms --git-dir ${PROJECT_SOURCE_DIR}/../atl24_v2_algorithms/.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE ALGOINFO)
+string(REGEX REPLACE "\n$" "" ALGOINFO "${ALGOINFO}")
+target_compile_definitions (atl24 PUBLIC ALGOINFO="${ALGOINFO}")
+
 # Set Environment Variables #
 set (INSTALLDIR /usr/local CACHE STRING "Installation directory for library and executables")
 set (CONFDIR ${INSTALLDIR}/etc/sliderule)
@@ -45,6 +50,7 @@ target_sources(atl24
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/PluginFields.cpp
 )
 
 # Include Directories #

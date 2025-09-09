@@ -30,80 +30,33 @@
  */
 
 /******************************************************************************
- *INCLUDES
+ * INCLUDE
  ******************************************************************************/
 
-#include "LuaEngine.h"
-#include "Icesat2Fields.h"
-
-#include "Atl24Writer.h"
-#include "BlunderRunner.h"
+#include "OsApi.h"
+#include "SystemConfig.h"
+#include "PluginFields.h"
 
 /******************************************************************************
- * DEFINES
- ******************************************************************************/
-
-#define LUA_ATL24_LIBNAME    "atl24"
-
-/******************************************************************************
- * LOCAL FUNCTIONS
+ * CLASS METHODS
  ******************************************************************************/
 
 /*----------------------------------------------------------------------------
- * atl24_version
+ * Constructor
  *----------------------------------------------------------------------------*/
-int atl24_version (lua_State* L)
+PluginFields::PluginFields(void):
+    FieldDictionary ({
+        {"sliderule_version",       &slideruleVersion},
+        {"sliderule_build",         &slideruleBuild},
+        {"sliderule_environment",   &slideruleEnvironment},
+        {"plugin_version",          &pluginVersion},
+        {"plugin_build",            &pluginBuild},
+        {"plugin_algoinfo",         &pluginAlgorithm}
+    }),
+    slideruleVersion(SystemConfig::getLibraryVersion()),
+    slideruleBuild(SystemConfig::getBuildInformation()),
+    pluginVersion(BINID),
+    pluginBuild(BUILDINFO),
+    pluginAlgorithm(ALGOINFO)
 {
-    /* Display Information on Terminal */
-    print2term("Version:    %s\n", BINID);
-    print2term("Build:      %s\n", BUILDINFO);
-    print2term("Algorithm:  %s\n", ALGOINFO);
-
-    /* Return Information to Lua */
-    lua_pushstring(L, BINID);
-    lua_pushstring(L, BUILDINFO);
-    lua_pushstring(L, ALGOINFO);
-    return 3;
-}
-
-/*----------------------------------------------------------------------------
- * atl24_open
- *----------------------------------------------------------------------------*/
-int atl24_open (lua_State *L)
-{
-    static const struct luaL_Reg atl24_functions[] = {
-        {"version",     atl24_version},
-        {"blunder",     BlunderRunner::luaCreate},
-        {"hdf5file",    Atl24Writer::luaCreate},
-        {NULL,          NULL}
-    };
-
-    luaL_newlib(L, atl24_functions);
-
-    return 1;
-}
-
-/******************************************************************************
- * EXPORTED FUNCTIONS
- ******************************************************************************/
-
-extern "C" {
-void initatl24 (void)
-{
-    /* Initialize Modules */
-    Atl24Writer::init();
-
-    /* Extend Lua */
-    LuaEngine::extend(LUA_ATL24_LIBNAME, atl24_open);
-
-    /* Indicate Presence of Package */
-    LuaEngine::indicate(LUA_ATL24_LIBNAME, LIBID);
-
-    /* Display Status */
-    print2term("%s package initialized (library=%s, plugin=%s)\n", LUA_ATL24_LIBNAME, LIBID, BINID);
-}
-
-void deinitatl24 (void)
-{
-}
 }
