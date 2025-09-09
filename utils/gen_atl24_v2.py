@@ -22,6 +22,7 @@ parser.add_argument('--input_files',        type=str,               default=None
 parser.add_argument('--url',                type=str,               default="s3://sliderule-public")
 parser.add_argument('--retries',            type=int,               default=3)
 parser.add_argument('--report_only',        action='store_true',    default=False)
+parser.add_argument('--test',               action='store_true',    default=False)
 args,_ = parser.parse_known_args()
 
 # Initialize Constants
@@ -46,6 +47,8 @@ logfile.setLevel(logging.INFO)
 
 # Initialize Concurrent Requests
 rqst_q = queue.Queue()
+if args.test:
+    concurrent_rqsts = 1
 if args.concurrency != None:
     concurrent_rqsts = args.concurrency
 elif args.desired_nodes != None:
@@ -107,6 +110,10 @@ for input_file in list_of_input_files:
 print(f'Granules Already Processed   {len(granules_already_processed)}')
 print(f'Granules Left to Process:    {len(granules_to_process)}')
 
+# Execute Test
+if args.test:
+    granules_to_process = ['ATL24_20181120020325_08010106_006_02_001_01.h5']
+
 # Queue Processing Requests
 for granule in granules_to_process:
     if "#" not in granule:
@@ -166,6 +173,9 @@ def worker(worker_id):
                         "with_checksum": False,
                     }
                 }
+                if args.test:
+                    parms["output"]["asset"] = None
+                    parms["output"]["path"] = "/tmp/" + granule[:-10] + "_" + RELEASE + "_" + VERSION + ".h5"
                 rsps = sliderule.source("atl24g2", {"parms": parms}, stream=True)
                 outfile = sliderule.procoutputfile(parms, rsps)
                 log.info(f'<{worker_id}> finished granule {outfile}')
