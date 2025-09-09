@@ -14,7 +14,7 @@ parser.add_argument('--domain',             type=str,               default="sli
 parser.add_argument('--organization',       type=str,               default="developers")
 parser.add_argument('--desired_nodes',      type=int,               default=None)
 parser.add_argument('--time_to_live',       type=int,               default=600) # 10 hours
-parser.add_argument('--log_file',           type=str,               default="atl24v2.log")
+parser.add_argument('--log_file',           type=str,               default="data/atl24v2.log")
 parser.add_argument('--concurrency',        type=int,               default=50)
 parser.add_argument('--startup_separation', type=int,               default=2) # seconds
 parser.add_argument('--input_file',         type=str,               default="data/atl24_granules_cycle_1.txt")
@@ -23,11 +23,9 @@ parser.add_argument('--url',                type=str,               default="s3:
 parser.add_argument('--retries',            type=int,               default=3)
 parser.add_argument('--report_only',        action='store_true',    default=False)
 parser.add_argument('--test',               action='store_true',    default=False)
+parser.add_argument("--release" ,           type=str,               default="002")
+parser.add_argument("--version" ,           type=str,               default="01")
 args,_ = parser.parse_known_args()
-
-# Initialize Constants
-RELEASE = "002"
-VERSION = "01"
 
 # Initialize Organization
 if args.organization == "None":
@@ -88,7 +86,7 @@ while is_truncated:
         for obj in response['Contents']:
             resource = obj['Key'].split("/")[-1]
             if resource.startswith("ATL24") and resource.endswith(".h5"):
-                existing_granules.append(resource.replace(RELEASE + "_" + VERSION + ".h5", "001_01.h5"))
+                existing_granules.append(resource.replace(args.release + "_" + args.version + ".h5", "001_01.h5"))
     # check if more data is available
     is_truncated = response['IsTruncated']
     continuation_token = response.get('NextContinuationToken')
@@ -167,7 +165,7 @@ def worker(worker_id):
                     "resource": granule,
                     "output": {
                         "asset": "sliderule-stage",
-                        "path": granule[:-10] + "_" + RELEASE + "_" + VERSION + ".h5",
+                        "path": granule[:-10] + "_" + args.release + "_" + args.version + ".h5",
                         "format": "h5",
                         "open_on_complete": False,
                         "with_checksum": False,
@@ -175,7 +173,7 @@ def worker(worker_id):
                 }
                 if args.test:
                     parms["output"]["asset"] = None
-                    parms["output"]["path"] = "/tmp/" + granule[:-10] + "_" + RELEASE + "_" + VERSION + ".h5"
+                    parms["output"]["path"] = "/tmp/" + granule[:-10] + "_" + args.release + "_" + args.version + ".h5"
                 rsps = sliderule.source("atl24g2", {"parms": parms}, stream=True)
                 outfile = sliderule.procoutputfile(parms, rsps)
                 log.info(f'<{worker_id}> finished granule {outfile}')

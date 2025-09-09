@@ -343,6 +343,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Invalid Kd");
             add_attribute(datasets, "source", "VIIRS Kd490");
             add_attribute(datasets, "units", "boolean");
+            add_attribute(datasets, "flag_meanings", "false, true");
+            add_attribute(datasets, "flag_values", "0, 1");
             goto_parent(datasets);
 
             /* Create Variable - invalid_wind_speed */
@@ -353,6 +355,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Invalid wind speed");
             add_attribute(datasets, "source", "ATL09");
             add_attribute(datasets, "units", "boolean");
+            add_attribute(datasets, "flag_meanings", "false, true");
+            add_attribute(datasets, "flag_values", "0, 1");
             goto_parent(datasets);
 
             /* Create Variable - lat_ph */
@@ -389,6 +393,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Low confidence bathymetry flag");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
+            add_attribute(datasets, "flag_meanings", "false, true");
+            add_attribute(datasets, "flag_values", "0, 1");
             goto_parent(datasets);
 
             /* Create Variable - night_flag */
@@ -399,6 +405,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Night flag");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
+            add_attribute(datasets, "flag_meanings", "false, true");
+            add_attribute(datasets, "flag_values", "0, 1");
             goto_parent(datasets);
 
             /* Create Variable - ortho_h */
@@ -419,6 +427,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Sensor depth exceeded");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "boolean");
+            add_attribute(datasets, "flag_meanings", "false, true");
+            add_attribute(datasets, "flag_values", "0, 1");
             goto_parent(datasets);
 
             /* Create Variable - sigma_thu */

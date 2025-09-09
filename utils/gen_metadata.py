@@ -13,10 +13,13 @@ from h5coro import h5coro, s3driver, logger
 # ################################################
 
 parser = argparse.ArgumentParser(description="""ATL24""")
-parser.add_argument('--summary_file',   type=str,   default="atl24_v2_granule_collection.csv")
+parser.add_argument('--summary_file',   type=str,   default="data/atl24_v2_granule_collection.csv")
+parser.add_argument('--error_file',     type=str,   default="data/atl24_v2_granule_errors.txt")
 parser.add_argument('--url',            type=str,   default="s3://sliderule-public")
 parser.add_argument("--loglvl" ,        type=str,   default="CRITICAL")
 parser.add_argument("--cores",          type=int,   default=os.cpu_count())
+parser.add_argument("--release" ,       type=str,   default="002")
+parser.add_argument("--version" ,       type=str,   default="01")
 args,_ = parser.parse_known_args()
 
 # ################################################
@@ -37,7 +40,7 @@ STATS = [
     ('bathy_min_depth','.3f'),
     ('bathy_max_depth','.3f'),
     ('bathy_std_depth','.3f'),
-    ('bathy_above_sea_level', ''),
+    ('bathy_above_sea_surface', ''),
     ('bathy_below_sensor_depth', ''),
     ('histogram',''),
     ('polygon', ''),
@@ -47,6 +50,7 @@ STATS = [
 
 VARIABLES = [
     "ortho_h",
+    "surface_h",
     "class_ph"
 ]
 
@@ -90,17 +94,15 @@ MONTH_TO_SEASON = { #[is_north][month] --> 0: winter, 1: spring, 2: summer, 3: f
     }
 }
 
-RELEASE = "002"
-VERSION = "01"
-
 # ################################################
 # Initialize
 # ################################################
 
 logger.config(args.loglvl)
 credentials = {"role": True, "profile":"sliderule"}
-granules_already_processed = {} # [name]: True"
+granules_already_processed = {} # [name]: True
 granules_to_process = [] # (name, size)
+granules_in_error = {} # [name]: True
 
 # ################################################
 # Open Summary File
@@ -117,8 +119,21 @@ else:
     csv_header = [entry[0] for entry in STATS]
     summary_file.write(','.join(csv_header) + "\n")
 
+# get granules in error
+if os.path.exists(args.error_file):
+    with open(args.error_file, "r") as file:
+        for line in file.readlines():
+            granules_in_error[line.strip()] = True
+error_file = open(args.error_file, "w")
+
 # report number of existing granules
 print(f'Granules Already Processed: {len(granules_already_processed)}')
+print(f'Granules In Error: {len(granules_in_error)}')
+
+# remove granules in error from granules already processed
+for granule in granules_in_error:
+    if granule in granules_already_processed:
+        del granules_already_processed[granule]
 
 # ################################################
 # List H5 Granules
@@ -148,7 +163,7 @@ while is_truncated:
     if 'Contents' in response:
         for obj in response['Contents']:
             granule = obj['Key'].split("/")[-1]
-            if granule.startswith("ATL24") and granule.endswith(RELEASE + "_" + VERSION + ".h5"):
+            if granule.startswith("ATL24") and granule.endswith(args.release + "_" + args.version + ".h5"):
                 if granule not in granules_already_processed:
                     granules_to_process.append((granule, obj["Size"]))
     # check if more data is available
@@ -193,12 +208,14 @@ def stat_worker(arg):
 
                 # build dataframes
                 df = pd.DataFrame(columns)
+                df["depth"] = df["surface_h"] - df["ortho_h"]
                 df_sea_surface = df[df["class_ph"] == 41]
+                df_subaqueous = df[df["class_ph"].isin([0, 40]) & df["depth"] >= 0.0] # treating depth == 0.0 as subaqueous to be consistent with histogram below
                 df_bathy = df[df["class_ph"] == 40]
 
                 # build histogram
-                values = df_bathy["ortho_h"].to_numpy()
-                hist, bin_edges = np.histogram(values, bins=np.arange(-50, 1, 1)) # (-50.0,-49.0] (-49.0,-48.0], ..., (-1.0, 0.0]
+                values = df_bathy["depth"].to_numpy()
+                hist, bin_edges = np.histogram(values, bins=np.arange(0, 51, 1)) # [0.0, 1.0), [1.0, 2.0), ..., [49.0, 50.0], note last range is fully closed
                 hist_str = ' '.join([f"{int(value)}" for value in hist])
 
                 # build stats
@@ -209,15 +226,16 @@ def stat_worker(arg):
                     "season": MONTH_TO_SEASON[region<8][month],
                     "size": size,
                     "total_photons": len(df),
+                    "subaqueous_photons": len(df_subaqueous),
                     "sea_surface_photons": len(df_sea_surface),
                     "sea_surface_std": df_sea_surface["ortho_h"].std(),
                     "bathy_photons": len(df_bathy),
-                    "bathy_mean_depth": df_bathy["ortho_h"].mean(),
-                    "bathy_min_depth": df_bathy["ortho_h"].min(),
-                    "bathy_max_depth": df_bathy["ortho_h"].max(),
-                    "bathy_std_depth": df_bathy["ortho_h"].std(),
-                    "bathy_above_sea_level": len(df_bathy[df_bathy["ortho_h"] > 0.0]),
-                    "bathy_below_sensor_depth": len(df_bathy[df_bathy["ortho_h"] <= -50.0]),
+                    "bathy_mean_depth": df_bathy["depth"].mean(),
+                    "bathy_min_depth": df_bathy["depth"].min(),
+                    "bathy_max_depth": df_bathy["depth"].max(),
+                    "bathy_std_depth": df_bathy["depth"].std(),
+                    "bathy_above_sea_surface": len(df_bathy[df_bathy["depth"] < 0.0]),
+                    "bathy_below_sensor_depth": len(df_bathy[df_bathy["depth"] > 50.0]),
                     "histogram": hist_str,
                     "polygon": extent["polygon"],
                     "begin_time": extent["begin_time"],
@@ -232,18 +250,17 @@ def stat_worker(arg):
                 csv_lines += ','.join([f'{row[entry[0]]:{entry[1]}}' for entry in STATS]) + "\n"
 
             except TypeError:
-                # missing beam
-                pass
+                pass # missing beam
 
         # close granule
         h5obj.close()
 
         # return csv lines
-        return csv_lines
+        return csv_lines, True
 
     except Exception as e:
         print(f'\n{granule} - Error: {e}')
-        return ''
+        return f'{granule}\n', False
 
 # ################################################
 # Start Process Workers
@@ -252,8 +269,11 @@ def stat_worker(arg):
 granule_step = 1000
 for i in range(0, len(granules_to_process), granule_step):
     pool = Pool(args.cores)
-    for result in pool.imap_unordered(stat_worker, granules_to_process[i:i+granule_step]):
-        if result != None:
+    for result, status in pool.imap_unordered(stat_worker, granules_to_process[i:i+granule_step]):
+        if status == True:
             summary_file.write(result)
             summary_file.flush()
+        else:
+            error_file.write(result)
+            error_file.flush()
     del pool
