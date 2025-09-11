@@ -13,13 +13,14 @@ from h5coro import h5coro, s3driver, logger
 # ################################################
 
 parser = argparse.ArgumentParser(description="""ATL24""")
-parser.add_argument('--summary_file',   type=str,   default="data/atl24_v2_granule_collection.csv")
-parser.add_argument('--error_file',     type=str,   default="data/atl24_v2_granule_errors.txt")
-parser.add_argument('--url',            type=str,   default="s3://sliderule-public")
-parser.add_argument("--loglvl" ,        type=str,   default="CRITICAL")
-parser.add_argument("--cores",          type=int,   default=os.cpu_count())
-parser.add_argument("--release" ,       type=str,   default="002")
-parser.add_argument("--version" ,       type=str,   default="01")
+parser.add_argument('--summary_file',   type=str,               default="data/atl24_v2_granule_collection.csv")
+parser.add_argument('--error_file',     type=str,               default="data/atl24_v2_granule_errors.txt")
+parser.add_argument('--url',            type=str,               default="s3://sliderule-public")
+parser.add_argument("--loglvl" ,        type=str,               default="CRITICAL")
+parser.add_argument("--cores",          type=int,               default=os.cpu_count())
+parser.add_argument("--release" ,       type=str,               default="002")
+parser.add_argument("--version" ,       type=str,               default="01")
+parser.add_argument('--skip_errors',    action='store_true',    default=False)
 args,_ = parser.parse_known_args()
 
 # ################################################
@@ -99,7 +100,7 @@ MONTH_TO_SEASON = { #[is_north][month] --> 0: winter, 1: spring, 2: summer, 3: f
 # ################################################
 
 logger.config(args.loglvl)
-credentials = {"role": True, "profile":"sliderule"}
+credentials = {"role": True, "role":"iam"}
 granules_already_processed = {} # [name]: True
 granules_to_process = [] # (name, size)
 granules_in_error = {} # [name]: True
@@ -131,9 +132,14 @@ print(f'Granules Already Processed: {len(granules_already_processed)}')
 print(f'Granules In Error: {len(granules_in_error)}')
 
 # remove granules in error from granules already processed
-for granule in granules_in_error:
-    if granule in granules_already_processed:
-        del granules_already_processed[granule]
+if args.skip_errors:
+    for granule in granules_in_error:
+        error_file.write(f'{granule}\n')
+        error_file.flush()
+else:
+    for granule in granules_in_error:
+        if granule in granules_already_processed:
+            del granules_already_processed[granule]
 
 # ################################################
 # List H5 Granules
