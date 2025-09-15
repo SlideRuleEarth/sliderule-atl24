@@ -94,10 +94,7 @@ void initatl24 (void)
     Atl24Writer::init();
 
     /* Extend Lua */
-    LuaEngine::extend(LUA_ATL24_LIBNAME, atl24_open);
-
-    /* Indicate Presence of Package */
-    LuaEngine::indicate(LUA_ATL24_LIBNAME, LIBID);
+    LuaEngine::extend(LUA_ATL24_LIBNAME, atl24_open, LIBID);
 
     /* Display Status */
     print2term("%s package initialized (library=%s, plugin=%s)\n", LUA_ATL24_LIBNAME, LIBID, BINID);

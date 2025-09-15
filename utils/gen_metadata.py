@@ -34,6 +34,7 @@ STATS = [
     ('season',''),
     ('size',''),
     ('total_photons',''),
+    ('subaqueous_photons',''),
     ('sea_surface_photons',''),
     ('sea_surface_std','.3f'),
     ('bathy_photons',''),
