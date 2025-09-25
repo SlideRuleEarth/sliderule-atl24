@@ -856,11 +856,13 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         uuid_t uuid;
         uuid_generate(uuid);
         uuid_unparse_lower(uuid, uuid_str);
+        const char* fileName = StringLib::find(parms->output.path.value.c_str(), '/', false) + 1;
+        if(!fileName) fileName = parms->output.path.value.c_str();
         add_group(datasets, "DatasetIdentification");
         add_attribute(datasets, "spatialRepresentationType", "along-track");
         add_attribute(datasets, "creationDate", creationDate.c_str());
         add_attribute(datasets, "uuid", uuid_str);
-        add_attribute(datasets, "fileName", parms->output.path.value.c_str());
+        add_attribute(datasets, "fileName", fileName);
         add_attribute(datasets, "VersionID", "002");
         add_attribute(datasets, "language", "eng");
         add_attribute(datasets, "characterSet", "utf8");
