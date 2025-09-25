@@ -33,6 +33,8 @@
  * INCLUDES
  ******************************************************************************/
 
+#include <uuid/uuid.h>
+
 #include "Atl24Writer.h"
 #include "PluginFields.h"
 #include "OsApi.h"
@@ -273,7 +275,6 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Photon classification");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
-//            add_attribute(datasets, "relabeled", df->getMetaData("relabeled")->toJson().c_str());
             goto_parent(datasets);
 
             /* Create Variable - confidence */
@@ -845,6 +846,31 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "long_name", "Query MetaData");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
+        goto_parent(datasets);
+
+        /* Create Group - DatasetIdentification */
+        TimeLib::gmt_time_t gmt = TimeLib::gmttime();
+        TimeLib::date_t date = TimeLib::gmt2date(gmt);
+        FString creationDate("%d-%02d-%02dT%02d:%02d:%02d.000000Z", date.year, date.month, date.day, gmt.hour, gmt.minute, gmt.second);
+        char uuid_str[UUID_STR_LEN];
+        uuid_t uuid;
+        uuid_generate(uuid);
+        uuid_unparse_lower(uuid, uuid_str);
+        add_group(datasets, "DatasetIdentification");
+        add_attribute(datasets, "spatialRepresentationType", "along-track");
+        add_attribute(datasets, "creationDate", creationDate.c_str());
+        add_attribute(datasets, "uuid", uuid_str);
+        add_attribute(datasets, "fileName", parms->output.path.value.c_str());
+        add_attribute(datasets, "VersionID", "002");
+        add_attribute(datasets, "language", "eng");
+        add_attribute(datasets, "characterSet", "utf8");
+        add_attribute(datasets, "shortName", "ATL24");
+        add_attribute(datasets, "originatorOrganizationName", "SlideRule");
+        add_attribute(datasets, "abstract", "ATL24 provides global along-track coastal and nearshore bathymetry, consisting of refraction corrected seafloor and sea surface heights (orthometric and ellipsoidal heights and instantaneous depths), as well as associated uncertainties.");
+        add_attribute(datasets, "purpose", "The purpose of ATL24 is to provide photon level classification of sea surface and seafloor for ATL03 data in coastal and nearshore regions.");
+        add_attribute(datasets, "credit", "The ATL24 product was designed and implemented by a team led by Lori Magruder at the University of Texas at Austin, and Christopher Parrish at Oregon State University.");
+        add_attribute(datasets, "status", "onGoing");
+        add_attribute(datasets, "topicCategory", "geoscientificInformation");
         goto_parent(datasets);
 
         /* Go Back to Parent Group */

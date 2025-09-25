@@ -19,8 +19,10 @@ add_library (atl24 MODULE "")
 set_target_properties (atl24 PROPERTIES OUTPUT_NAME atl24)
 set_target_properties (atl24 PROPERTIES PREFIX "")
 
-# Prerequisites #
+# Dependencies #
 find_package (Lua "5.3")
+find_library(LIBUUID_LIBRARY libuuid.so)
+target_link_libraries (atl24 PUBLIC ${LIBUUID_LIBRARY})
 
 # Version Information #
 execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR} --git-dir ${PROJECT_SOURCE_DIR}/.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE BUILDINFO)
