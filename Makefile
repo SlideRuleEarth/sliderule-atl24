@@ -42,7 +42,7 @@ tag: ## create version tag in this repository and release it on GitHub
 	git push --tags && git push
 	gh release create $(VERSION) -t $(VERSION) --notes "see https://slideruleearth.io for details"
 
-release: distclean tag config-release all publish ## release a version of atl24 plugin; needs VERSION
+release: distclean tag config-stage-release all publish ## release a version of atl24 plugin; needs VERSION
 
 clean: ## clean last build
 	- make -C $(BUILD) clean
