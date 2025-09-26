@@ -25,7 +25,7 @@ class TestAtl24g2:
         for key in ['ancillary_data', 'gt1l', 'gt1r', 'gt2l', 'gt2r', 'gt3l', 'gt3r', 'metadata', 'orbit_info']:
             assert key in h5f
         assert len(h5f["gt1l"].keys()) == 19
-        for key in ['class_ph', 'confidence', 'ellipse_h', 'index_ph', 'index_seg', 'invalid_kd', 'invalid_wind_speed', 'lat_ph', 'lon_ph', 'low_confidence_flag', 'night_flag', 'ortho_h', 'sensor_depth_exceeded', 'sigma_thu', 'sigma_tvu', 'surface_h', 'time_ns', 'x_atc', 'y_atc']:
+        for key in ['class_ph', 'confidence', 'ellipse_h', 'index_ph', 'index_seg', 'invalid_kd', 'invalid_wind_speed', 'lat_ph', 'lon_ph', 'low_confidence_flag', 'night_flag', 'ortho_h', 'sensor_depth_exceeded', 'sigma_thu', 'sigma_tvu', 'surface_h', 'delta_time', 'x_atc', 'y_atc']:
             assert key in h5f["gt1l"]
         assert sum(h5f["gt1l"]["night_flag"]) == 188588
         assert sum(h5f["gt1l"]["low_confidence_flag"]) == 4

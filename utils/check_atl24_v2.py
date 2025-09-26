@@ -47,7 +47,7 @@ VARIABLES = [
     "sigma_thu",
     "sigma_tvu",
     "surface_h",
-#    "time_ns",
+    "delta_time",
     "x_atc",
     "y_atc"
 ]
@@ -184,7 +184,7 @@ def stat_worker(granule):
                 for var in ["confidence", "ellipse_h", "ortho_h", "index_ph", "index_seg",
                             "invalid_kd", "invalid_wind_speed", "lat_ph", "lon_ph", "night_flag",
                             "sensor_depth_exceeded", "sigma_thu", "sigma_tvu", "surface_h",
-                            "x_atc", "y_atc"]:
+                            "delta_time", "x_atc", "y_atc"]:
                     diffs = (df_v1[var] != df_v2[var])
                     if diffs.sum() > 0:
                         print(f'Error - {beam}/{var}: {diffs.sum()} mismatched values')
