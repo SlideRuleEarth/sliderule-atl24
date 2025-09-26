@@ -287,7 +287,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "units", "scalar");
             goto_parent(datasets);
 
-            /* Create Variable - time_ns */
+            /* Create Variable - delta_time */
             FieldColumn<int64_t> delta_time;
             for(long j = 0; j < df->time_ns.length(); j++)
             {
@@ -295,7 +295,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
                 int64_t value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
                 delta_time.append(value);
             }
-            add_variable(datasets, "time_ns", &delta_time);
+            add_variable(datasets, "delta_time", &delta_time);
             add_attribute(datasets, "contentType", "physicalMeasurement");
             add_attribute(datasets, "coordinates", "lat_ph lon_ph");
             add_attribute(datasets, "description", "The transmit time of a given photon, measured in seconds from the ATLAS Standard Data Product Epoch. Note that multiple received photons associated with a single transmit pulse will have the same delta_time. The ATLAS Standard Data Products (SDP) epoch offset is defined within /ancillary_data/atlas_sdp_gps_epoch as the number of GPS seconds between the GPS epoch (1980-01-06T00:00:00.000000Z UTC) and the ATLAS SDP epoch. By adding the offset contained within atlas_sdp_gps_epoch to delta time parameters, the time in gps_seconds relative to the GPS epoch can be computed.");

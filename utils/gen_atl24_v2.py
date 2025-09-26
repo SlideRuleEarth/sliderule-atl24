@@ -96,6 +96,7 @@ print('') # new line
 granules_to_process = []
 granules_already_processed = []
 for input_file in list_of_input_files:
+    print(f'Reading {input_file}')
     with open(input_file, "r") as file:
         for line in file.readlines():
             granule = line.strip()
