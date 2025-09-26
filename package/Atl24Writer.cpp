@@ -288,11 +288,11 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             goto_parent(datasets);
 
             /* Create Variable - delta_time */
-            FieldColumn<int64_t> delta_time;
+            FieldColumn<double> delta_time;
             for(long j = 0; j < df->time_ns.length(); j++)
             {
-                static const int64_t ATLAS_LEAP_SECONDS = 18; // optimization based on the time period of ATLAS data at the time of ATL24 generation (2025)
-                int64_t value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
+                static const double ATLAS_LEAP_SECONDS = 18; // optimization based on the time period of ATLAS data at the time of ATL24 generation (2025)
+                double value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
                 delta_time.append(value);
             }
             add_variable(datasets, "delta_time", &delta_time);
