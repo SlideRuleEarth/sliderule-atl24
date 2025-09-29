@@ -84,7 +84,7 @@ def metadata(parms):
     # initialize arguments
     granule = parms["granule"]
     path = parms["url"].split("s3://")[-1] + "/" + granule
-    csv_lines = ""
+    csv_lines = ','.join([f'{entry[0]}' for entry in METADATA_STATS]) + "\n"
 
     try:
         # open granule

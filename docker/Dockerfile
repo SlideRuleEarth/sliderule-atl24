@@ -4,6 +4,7 @@ FROM amazonlinux:2023
 RUN dnf update -y \
     && dnf install -y \
         wget \
+        git \
     && dnf clean all \
     && rm -rf /var/cache/yum
 
@@ -15,6 +16,9 @@ RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Minif
 COPY conda-linux-aarch64.lock .
 RUN /root/miniforge3/bin/mamba create --copy -p /env --file conda-linux-aarch64.lock \
     && /root/miniforge3/bin/conda clean -afy
+
+# install h5coro
+RUN /env/bin/pip install git+https://github.com/SlideRuleEarth/h5coro.git
 
 # install python applications
 COPY runner.py /runner.py

@@ -13,6 +13,7 @@ from sliderule import sliderule
 parser = argparse.ArgumentParser(description="""ATL24""")
 parser.add_argument('--summary_file',       type=str,               default="data/atl24_v2_granule_collection.csv")
 parser.add_argument('--error_file',         type=str,               default="data/atl24_v2_granule_errors.txt")
+parser.add_argument('--url',                type=str,               default="s3://sliderule-public")
 parser.add_argument('--domain',             type=str,               default="slideruleearth.io")
 parser.add_argument('--organization',       type=str,               default="developers")
 parser.add_argument('--concurrency',        type=int,               default=None)
@@ -28,8 +29,9 @@ args,_ = parser.parse_known_args()
 if args.organization == "None":
     args.organization = None
 
-# Create Multithreaded Lock
+# Create Multithreaded Control
 lock = threading.Lock()
+initial_summary_write = True
 
 # Initialize Lists
 granules_already_processed = {} # [name]: True
@@ -43,6 +45,7 @@ granules_in_error = {} # [name]: True
 # get existing granules
 try:
     summary_df = pd.read_csv(args.summary_file)
+    initial_summary_write = False
     for granule in summary_df["granule"]:
         granules_already_processed[granule] = True
     summary_file = open(args.summary_file, "a")
@@ -70,7 +73,6 @@ for granule in granules_in_error:
 # report number of existing granules
 print(f'Granules Already Processed: {len(granules_already_processed)}')
 print(f'Granules In Error: {len(granules_in_error)}')
-
 
 # ################################################
 # List H5 Granules
@@ -109,7 +111,7 @@ if not args.test:
         continuation_token = response.get('NextContinuationToken')
     print("") # new line
 else:
-    granules_to_process = ['ATL24_20181120020325_08010106_006_02_001_01.h5']
+    granules_to_process = ['ATL24_20181120020325_08010106_006_02_002_01.h5']
 
 # report new granules
 print(f'Granules Left to Process: {len(granules_to_process)}')
@@ -144,6 +146,8 @@ sliderule.init(args.domain, verbose=False, organization=args.organization, rethr
 # Worker Thread
 def worker(worker_id):
 
+    global args, initial_summary_write
+
     # While Queue Not Empty
     complete = False
     while not complete:
@@ -167,13 +171,19 @@ def worker(worker_id):
                 "command": "/env/bin/python /runner.py", # <input file> <output file>
                 "parms": {
                     "function": "metadata",
-                    "granule": granule
+                    "granule": granule,
+                    "url": args.url
                 }
             }
             rsps = sliderule.source("execre", parms)
             if rsps["status"]:
                 with lock:
-                    summary_file.write(json.dumps(rsps))
+                    if initial_summary_write:
+                        initial_summary_write = False
+                        summary_file.write(rsps["result"])
+                    else:
+                        result = rsps["result"].split("\n")
+                        summary_file.write('\n'.join(result[1:])) # removes csv header line
                     summary_file.flush()
                 print(f'Processed: {granule}')
             else:
