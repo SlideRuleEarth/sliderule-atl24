@@ -195,7 +195,7 @@ def stat_worker(granule):
                 sys.stdout.flush()
 
             except TypeError as e:
-                print(f"Error: {e}")
+                #print(f"Error: {e}")
                 pass # missing beam
 
         # close granules
@@ -217,11 +217,14 @@ def stat_worker(granule):
 # Start Process Workers
 # ################################################
 
-granule_step = 1000
+granule_step = 75
+granules_processed = 0
 for i in range(0, len(granules_to_process), granule_step):
     pool = Pool(args.cores)
     for result in pool.imap_unordered(stat_worker, granules_to_process[i:i+granule_step]):
         if args.test == None:
             summary_file.write(result)
             summary_file.flush()
+    granules_processed += granule_step
+    print(f'\nCycling process pool - processed {granules_processed} granules')
     del pool

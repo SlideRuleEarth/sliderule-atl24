@@ -1,9 +1,11 @@
 ROOT = $(shell pwd)
 BUILD = $(ROOT)/build
+STAGE = $(ROOT)/stage
 VERSION ?= latest
 SLIDERULE ?= $(ROOT)/../sliderule
 ATL24 ?= $(ROOT)/../atl24_v2_algorithms
 BUCKET ?= s3://sliderule
+ECR ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
 USERCFG ?=
 
 all: ## build code
@@ -43,6 +45,21 @@ tag: ## create version tag in this repository and release it on GitHub
 	gh release create $(VERSION) -t $(VERSION) --notes "see https://slideruleearth.io for details"
 
 release: distclean tag config-stage-release all publish ## release a version of atl24 plugin; needs VERSION
+
+atl24d-lock:
+	cd docker && conda-lock -p linux-$(shell arch) -f environment.yml
+	cd docker && conda-lock render -p linux-$(shell arch)
+
+atl24d:
+	-rm -Rf $(STAGE)
+	mkdir -p $(STAGE)
+	cp docker/Dockerfile $(STAGE)
+	cp docker/conda-* $(STAGE)
+	cp docker/runner.* $(STAGE)
+	cd $(STAGE) && docker build -t $(ECR)/atl24d:$(VERSION) .
+
+atl24d-push:
+	docker push $(ECR)/atl24d:$(VERSION)
 
 clean: ## clean last build
 	- make -C $(BUILD) clean

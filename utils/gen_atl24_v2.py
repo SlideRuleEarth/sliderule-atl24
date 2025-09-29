@@ -1,4 +1,4 @@
-from sliderule import sliderule, icesat2
+from sliderule import sliderule
 import argparse
 import time
 import threading

@@ -1,0 +1,7 @@
+name: atl24meta
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pandas
+  - pip

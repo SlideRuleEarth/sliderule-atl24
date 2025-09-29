@@ -1,4 +1,5 @@
 build/
+stage/
 .vscode/
 __pycache__/
 .pytest_cache/
