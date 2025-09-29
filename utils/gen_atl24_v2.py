@@ -69,7 +69,7 @@ bucket = path.split("/")[0]
 subfolder = '/'.join(path.split("/")[1:])
 
 # Get List of Granules from S3 Bucket
-existing_granules = []
+existing_granules = {}
 is_truncated = True
 continuation_token = None
 while is_truncated:
@@ -86,7 +86,8 @@ while is_truncated:
         for obj in response['Contents']:
             resource = obj['Key'].split("/")[-1]
             if resource.startswith("ATL24") and resource.endswith(".h5"):
-                existing_granules.append(resource.replace(args.release + "_" + args.version + ".h5", "001_01.h5"))
+                granule = resource.replace(args.release + "_" + args.version + ".h5", "001_01.h5")
+                existing_granules[granule] = True
     # check if more data is available
     is_truncated = response['IsTruncated']
     continuation_token = response.get('NextContinuationToken')
@@ -106,7 +107,7 @@ for input_file in list_of_input_files:
                 granules_to_process.append(granule)
 
 # Display Parameters
-print(f'Granules Already Processed   {len(granules_already_processed)}')
+print(f'Granules Already Processed:  {len(granules_already_processed)}')
 print(f'Granules Left to Process:    {len(granules_to_process)}')
 
 # Execute Test
