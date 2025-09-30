@@ -30,6 +30,7 @@
 import sys
 import json
 from h5coro import h5coro, s3driver
+from shapely.geometry import Polygon
 import numpy as np
 import pandas as pd
 
@@ -93,9 +94,13 @@ def metadata(parms):
         # read datasets
         datasets = [f'{beam}/{var}' for beam in BEAMS for var in METADATA_VARIABLES]
         promise = h5obj.readDatasets(datasets + ['metadata/extent'], block=True, enableAttributes=False)
-
-        # pull out metadata
         extent = json.loads(promise["metadata/extent"])
+
+        # build simplified polygon
+        poly_list = extent["polygon"].split(" ")
+        coord_list = [(poly_list[i],poly_list[i+1]) for i in range(0, len(poly_list), 2)]
+        poly = Polygon(coord_list).buffer(0.01).simplify(0.01)
+        poly_str = ' '.join([f'{x[0]:.6f} {x[1]:.6f}' for x in poly.exterior.coords])
 
         # process each beam in the granule
         for beam in BEAMS:
@@ -137,7 +142,7 @@ def metadata(parms):
                     "bathy_above_sea_surface": len(df_bathy[df_bathy["depth"] < 0.0]),
                     "bathy_below_sensor_depth": len(df_bathy[df_bathy["depth"] > 50.0]),
                     "histogram": hist_str,
-                    "polygon": extent["polygon"],
+                    "polygon": poly_str,
                     "begin_time": extent["begin_time"],
                     "end_time": extent["end_time"]
                 }

@@ -8,35 +8,35 @@ BUCKET ?= s3://sliderule
 ECR ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
 USERCFG ?=
 
-all: ## build code
+all:
 	make -j8 -C $(BUILD)
 
-config: prep ## configure make for release version of sliderule
+config: prep
 	cd $(BUILD) && \
 	cmake -DCMAKE_BUILD_TYPE=Release -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
-config-stage-debug: prep ## configure make to stage debug version of plugin with a local install of sliderule
+config-stage-debug: prep
 	cd $(BUILD) && \
 	cmake -DCMAKE_BUILD_TYPE=Debug -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
-config-stage-release: prep ## configure make to stage release version of plugin with a local install of sliderule
+config-stage-release: prep
 	cd $(BUILD) && \
 	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
 
-install: ## install sliderule to system
+install:
 	make -C $(BUILD) install
 
-uninstall: ## uninstall most recent install of sliderule from system
+uninstall:
 	xargs rm < $(BUILD)/install_manifest.txt
 
-prep: ## create necessary build directories
+prep:
 	mkdir -p $(BUILD)
 
-publish: ## upload plugin to slideruleearth plugin bucket
+publish:
 	aws s3 cp $(BUILD)/atl24.so $(BUCKET)/plugins/
 	aws s3 cp endpoints/atl24g2.lua $(BUCKET)/plugins/api/
 
-tag: ## create version tag in this repository and release it on GitHub
+tag:
 	echo $(VERSION) > $(ROOT)/version.txt
 	git add $(ROOT)/version.txt
 	git commit -m "Version $(VERSION)"
@@ -44,13 +44,13 @@ tag: ## create version tag in this repository and release it on GitHub
 	git push --tags && git push
 	gh release create $(VERSION) -t $(VERSION) --notes "see https://slideruleearth.io for details"
 
-release: distclean tag config-stage-release all publish ## release a version of atl24 plugin; needs VERSION
+release: distclean tag config-stage-release all publish
 
 atl24d-lock:
 	cd docker && conda-lock -p linux-$(shell arch) -f environment.yml
 	cd docker && conda-lock render -p linux-$(shell arch)
 
-atl24d:
+atl24d-docker:
 	-rm -Rf $(STAGE)
 	mkdir -p $(STAGE)
 	cp docker/Dockerfile $(STAGE)
@@ -61,12 +61,12 @@ atl24d:
 atl24d-push:
 	docker push $(ECR)/atl24d:$(VERSION)
 
-clean: ## clean last build
+atl24d-docker: atl24d-lock atl24d-docker atl24d-push
+
+clean:
 	- make -C $(BUILD) clean
 
-distclean: ## fully remove all non-version controlled files and directories
+distclean:
 	- rm -Rf $(BUILD)
 
-help: ## that's me!
-	@grep -E '^[a-zA-Z_-].+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 

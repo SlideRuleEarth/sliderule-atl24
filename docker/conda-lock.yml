@@ -58,6 +58,19 @@ package:
     sha256: 837b795a2bb39b75694ba910c13c15fa4998d4bb2a622c214a6a5174b2ae53d1
   category: main
   optional: false
+- name: geos
+  version: 3.14.0
+  manager: conda
+  platform: linux-aarch64
+  dependencies:
+    libgcc: '>=14'
+    libstdcxx: '>=14'
+  url: https://conda.anaconda.org/conda-forge/linux-aarch64/geos-3.14.0-h57520ee_0.conda
+  hash:
+    md5: 33fde05cff2eb40b492326ebd7840960
+    sha256: 1cdccc4afd9f030f2352fca54bff87ed3eecb394ba1a068ef7830a23877f682d
+  category: main
+  optional: false
 - name: ld_impl_linux-aarch64
   version: '2.44'
   manager: conda
@@ -307,7 +320,7 @@ package:
   category: main
   optional: false
 - name: pandas
-  version: 2.3.2
+  version: 2.3.3
   manager: conda
   platform: linux-aarch64
   dependencies:
@@ -319,10 +332,10 @@ package:
     python-tzdata: '>=2022.7'
     python_abi: 3.13.*
     pytz: '>=2020.1'
-  url: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.2-py313h9de0199_0.conda
+  url: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.3.3-py313h9de0199_0.conda
   hash:
-    md5: f21d6a5ae8cf6f3bf61f5097cb510eb6
-    sha256: f50b6f88fdfd5d58b1aa5ff6ef2d7ad36c2594c7bb83597e49ea9b938b8eeb8d
+    md5: 3923086a5c6c8b8656072f3d04168f44
+    sha256: 37c572ac587cc92fdfc272d807c35bf98b48b476fcb22b9b8d9ac07a4dcb4ff8
   category: main
   optional: false
 - name: pip
@@ -423,6 +436,22 @@ package:
   hash:
     md5: c0f08fc2737967edde1a272d4bf41ed9
     sha256: 54bed3a3041befaa9f5acde4a37b1a02f44705b7796689574bcf9d7beaad2959
+  category: main
+  optional: false
+- name: shapely
+  version: 2.1.2
+  manager: conda
+  platform: linux-aarch64
+  dependencies:
+    geos: '>=3.14.0,<3.14.1.0a0'
+    libgcc: '>=14'
+    numpy: '>=1.23,<3'
+    python: '>=3.13,<3.14.0a0'
+    python_abi: 3.13.*
+  url: https://conda.anaconda.org/conda-forge/linux-aarch64/shapely-2.1.2-py313h3965d89_0.conda
+  hash:
+    md5: 68519f07c3bad20fc05b43853f8289de
+    sha256: 1ef6a55aa150e57eb5630af448e3acbd1e522367bf09a2ce6c37fe10f6664c7f
   category: main
   optional: false
 - name: six
