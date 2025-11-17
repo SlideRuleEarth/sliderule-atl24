@@ -63,6 +63,9 @@ atl24d-push:
 
 atl24d-docker: atl24d-lock atl24d-docker atl24d-push
 
+database-export:
+	aws s3 cp data/atl24r2.db s3://sliderule/cf/
+
 clean:
 	- make -C $(BUILD) clean
 
