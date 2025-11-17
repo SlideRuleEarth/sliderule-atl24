@@ -8,6 +8,7 @@ import json
 import boto3
 import pandas as pd
 from sliderule import sliderule
+from sliderule.session import Session
 
 # Command Line Arguments
 parser = argparse.ArgumentParser(description="""ATL24""")
@@ -105,7 +106,7 @@ if not args.test:
                 granule = obj['Key'].split("/")[-1]
                 if granule.startswith("ATL24") and granule.endswith(args.release + "_" + args.version + ".h5"):
                     if granule not in granules_already_processed:
-                        granules_to_process.append((granule, obj["Size"]))
+                        granules_to_process.append(granule)
         # check if more data is available
         is_truncated = response['IsTruncated']
         continuation_token = response.get('NextContinuationToken')
@@ -137,7 +138,7 @@ if args.report_only:
     sys.exit(0)
 
 # Initialize Python Client
-sliderule.init(args.domain, verbose=False, organization=args.organization, rethrow=True)
+session = Session(domain=args.domain, organization=args.organization, rethrow=True, rqst_timeout=(10,600))
 
 # ################################################
 # Thread Processing
@@ -146,7 +147,7 @@ sliderule.init(args.domain, verbose=False, organization=args.organization, rethr
 # Worker Thread
 def worker(worker_id):
 
-    global args, initial_summary_write
+    global args, initial_summary_write, session
 
     # While Queue Not Empty
     complete = False
@@ -175,16 +176,17 @@ def worker(worker_id):
                     "url": args.url
                 }
             }
-            rsps = sliderule.source("execre", parms)
+            rsps = sliderule.source("execre", parms, session=session)
             if rsps["status"]:
-                with lock:
-                    if initial_summary_write:
-                        initial_summary_write = False
-                        summary_file.write(rsps["result"])
-                    else:
-                        result = rsps["result"].split("\n")
-                        summary_file.write('\n'.join(result[1:])) # removes csv header line
-                    summary_file.flush()
+                if not args.test:
+                    with lock:
+                        if initial_summary_write:
+                            initial_summary_write = False
+                            summary_file.write(rsps["result"])
+                        else:
+                            result = rsps["result"].split("\n")
+                            summary_file.write('\n'.join(result[1:])) # removes csv header line
+                        summary_file.flush()
                 print(f'Processed: {granule}')
             else:
                 raise RuntimeError(f'{rsps["result"]}')
