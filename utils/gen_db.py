@@ -21,7 +21,7 @@ args,_ = parser.parse_known_args()
 print(f'Loading collection {args.collection_file}... ', end='')
 sys.stdout.flush()
 start_time = time.perf_counter()
-collection_df = gpd.pd.read_csv(args.collection_file)
+collection_df = gpd.pd.read_csv(args.collection_file, usecols=['granule', 'beam', 'season', 'bathy_photons', 'bathy_mean_depth', 'bathy_min_depth', 'bathy_max_depth', 'polygon', 'begin_time'])
 print(f'completed in {time.perf_counter() - start_time:.2f} secs.')
 
 # -------------------------------------------
@@ -38,9 +38,8 @@ print(f'Creating geometry column... ', end='')
 sys.stdout.flush()
 start_time = time.perf_counter()
 collection_df["geometry"] = collection_df.apply(lambda row: getpoly(row['polygon']), axis=1)
+del collection_df["polygon"] # remove polygon now that it is contained in the geometry column
 collection_gdf = gpd.GeoDataFrame(collection_df, geometry='geometry', crs='EPSG:7912')
-collection_gdf = collection_gdf[['granule', 'beam', 'season', 'bathy_photons', 'bathy_mean_depth', 'bathy_min_depth', 'bathy_max_depth', 'begin_time']]
-collection_gdf.set_index("begin_time", inplace=True)
 print(f'completed in {time.perf_counter() - start_time:.2f} secs.')
 
 # -------------------------------------------
@@ -67,9 +66,14 @@ db.execute(f"""
     INSTALL spatial;
     LOAD spatial;
     CREATE TABLE atl24db AS
-    SELECT *
+    SELECT
+        * EXCLUDE (begin_time),
+        CAST(begin_time AS TIMESTAMP) AS begin_time
     FROM '{args.parquet_file}'
     ORDER BY begin_time;
+    CREATE INDEX idx_begin_time ON atl24db(begin_time);
+    CREATE INDEX idx_granule ON atl24db(granule);
+    CREATE INDEX idx_geom ON atl24db USING RTREE(geometry);
 """)
 print(f'completed in {time.perf_counter() - start_time:.2f} secs.')
 
