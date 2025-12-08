@@ -29,7 +29,7 @@ print(f'completed in {time.perf_counter() - start_time:.2f} secs.')
 # -------------------------------------------
 def getpoly(poly_str):
     poly_list = poly_str.split(" ")
-    coord_list = [(poly_list[i],poly_list[i+1]) for i in range(0, len(poly_list), 2)]
+    coord_list = [(poly_list[i+1],poly_list[i]) for i in range(0, len(poly_list), 2)]
     if len(coord_list) > 20:
         return Polygon(coord_list).buffer(0.01).simplify(0.01)
     else:
