@@ -14,7 +14,7 @@ rqst["parms"]["atl24"] = {
 -- create global objects
 local start_time    = time.gps() -- for timeout handling
 local userlog       = msg.publish(_rqst.rspq) -- for alerts
-local parms         = icesat2.parms(rqst["parms"], rqst["key_space"], "icesat2-atl24", rqst["resource"])
+local parms         = icesat2.parms(rqst["parms"], rqst["key_space"], "icesat2-atl24v1", rqst["resource"])
 local atl24h5       = h5.object(parms["asset"], parms["resource"])
 
 -- create atl24 dataframes from release 01 granules

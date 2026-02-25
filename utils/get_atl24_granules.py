@@ -9,7 +9,7 @@ args,_ = parser.parse_known_args()
 
 for cycle in args.cycles:
     parms = {
-        "asset": "icesat2-atl24",
+        "asset": "icesat2-atl24v1",
         "cycle": cycle,
         "max_resources": args.max_resources
     }

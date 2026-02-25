@@ -15,8 +15,8 @@ parser.add_argument('--domain',             type=str,               default="sli
 parser.add_argument('--organization',       type=str,               default="sliderule")
 parser.add_argument('--desired_nodes',      type=int,               default=None)
 parser.add_argument('--time_to_live',       type=int,               default=600) # 10 hours
-parser.add_argument('--before_dir',         type=str,               default="/data/ATL24/test_cleanup/before")
-parser.add_argument('--after_dir',          type=str,               default="/data/ATL24/test_cleanup/after")
+parser.add_argument('--before_dir',         type=str,               default="/data/test_cleanup/before")
+parser.add_argument('--after_dir',          type=str,               default="/data/test_cleanup/after")
 parser.add_argument('--test_run',           action='store_true',    default=False) # exit after first test
 args,_ = parser.parse_known_args()
 
