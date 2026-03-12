@@ -3,6 +3,24 @@
 #     This is because the NSIDC role associated with the kinesis stream allows only the
 #     the silderules3 role associated with the EC2 instance to assume its role.
 
+
+# import boto3
+# import hashlib
+#
+# s3 = boto3.client("s3")
+#
+# response = s3.get_object(
+#     Bucket="my-bucket",
+#     Key="large-file.bin",
+# )
+#
+# sha256 = hashlib.sha256()
+#
+# for chunk in iter(lambda: response["Body"].read(1024 * 1024), b""):
+#     sha256.update(chunk)
+#
+# print(sha256.hexdigest())
+
 import boto3
 import json
 import uuid
@@ -14,28 +32,28 @@ cnm_records = [
         "version": 1.3,
         "submissionTime": "",
         "identifier": "",
-        "collection": "ATL24_D2C",
-        "provider": "CISS",
+        "collection": "ATL24",
+        "provider": "ICESat-2_sliderule",
         "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
         "product": {
-            "name": "ATL24_D2C_20181014082645_02400106_006_02_001_01.h5",
-            "dataVersion": "001",
+            "name": "ATL24_20181014082645_02400106_006_02_002_01.h5",
+            "dataVersion": "002",
             "files": [
                 {
-                    "name": "ATL24_D2C_20181014082645_02400106_006_02_001_01.iso.xml",
+                    "name": "ATL24_20181014082645_02400106_006_02_002_01.iso.xml",
                     "type": "metadata",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014082645_02400106_006_02_001_01.iso.xml",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014082645_02400106_006_02_002_01.iso.xml",
                     "checksumType": "SHA256",
-                    "checksum": "cfcb0bd82ce3a940549684227b7994262957af3c3f3b72e5cd77421d2648178b",
-                    "size": 21543
+                    "checksum": "5f1c2a836eb2be1935aefb3387ad337e9fa0de359c847e626ee0ac1afd4febc5",
+                    "size": 21522
                 },
                 {
-                    "name": "ATL24_D2C_20181014082645_02400106_006_02_001_01.h5",
+                    "name": "ATL24_20181014082645_02400106_006_02_002_01.h5",
                     "type": "data",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014082645_02400106_006_02_001_01.h5",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014082645_02400106_006_02_002_01.h5",
                     "checksumType": "SHA256",
-                    "checksum": "ccb5eb4a478295141ffbeca2ce2b99f261d32e7be2ef3ff76891f31e6a620d96",
-                    "size": 55219186
+                    "checksum": "c18c468c5e0060f94579ab33fce82fb3d634709bbed1192b5610fa4407904390",
+                    "size": 54988498
                 }
             ]
         }
@@ -44,28 +62,28 @@ cnm_records = [
         "version": 1.3,
         "submissionTime": "",
         "identifier": "",
-        "collection": "ATL24_D2C",
-        "provider": "CISS",
+        "collection": "ATL24",
+        "provider": "ICESat-2_sliderule",
         "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
         "product": {
-            "name": "ATL24_D2C_20181014083516_02400107_006_02_001_01.h5",
+            "name": "ATL24_20181014083516_02400107_006_02_002_01.h5",
             "dataVersion": "001",
             "files": [
                 {
-                    "name": "ATL24_D2C_20181014083516_02400107_006_02_001_01.iso.xml",
+                    "name": "ATL24_20181014083516_02400107_006_02_002_01.iso.xml",
                     "type": "metadata",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014083516_02400107_006_02_001_01.iso.xml",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014083516_02400107_006_02_002_01.iso.xml",
                     "checksumType": "SHA256",
-                    "checksum": "6795600ab8c18395378378fd3f69eceb7cac7130607eea86d6f2506aa91dfa38",
-                    "size": 21162
+                    "checksum": "a00f9319df8ceb373b606b84e2d16091fecc45f7a1e48bedb365a1cf70dfd80e",
+                    "size": 21141
                 },
                 {
-                    "name": "ATL24_D2C_20181014083516_02400107_006_02_001_01.h5",
+                    "name": "ATL24_20181014083516_02400107_006_02_002_01.h5",
                     "type": "data",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014083516_02400107_006_02_001_01.h5",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014083516_02400107_006_02_002_01.h5",
                     "checksumType": "SHA256",
-                    "checksum": "b8dd2e7f5206b908bb8c4af47390187d35872e23b4e3e0c44b4a85e8f6d1b703",
-                    "size": 192597644
+                    "checksum": "0091062f18011d8b37931e8f424e7f04281a91d555734eb5a7ca1a72701bf701",
+                    "size": 192568906
                 }
             ]
         }
@@ -74,28 +92,28 @@ cnm_records = [
         "version": 1.3,
         "submissionTime": "",
         "identifier": "",
-        "collection": "ATL24_D2C",
-        "provider": "CISS",
+        "collection": "ATL24",
+        "provider": "ICESat-2_sliderule",
         "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
         "product": {
-            "name": "ATL24_D2C_20181014100103_02410106_006_02_001_01.h5",
+            "name": "ATL24_20181014100103_02410106_006_02_002_01.h5",
             "dataVersion": "001",
             "files": [
                 {
-                    "name": "ATL24_D2C_20181014100103_02410106_006_02_001_01.iso.xml",
+                    "name": "ATL24_20181014100103_02410106_006_02_002_01.iso.xml",
                     "type": "metadata",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014100103_02410106_006_02_001_01.iso.xml",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014100103_02410106_006_02_002_01.iso.xml",
                     "checksumType": "SHA256",
-                    "checksum": "a5f67df1762651268932755c58563523c2a36b43bd4edd3ead7d7817720807df",
-                    "size": 21546
+                    "checksum": "feca761b8d0573d789442176b022625a04e4cd33d49b60a47237b94159c0c9d1",
+                    "size": 21525
                 },
                 {
-                    "name": "ATL24_D2C_20181014100103_02410106_006_02_001_01.h5",
+                    "name": "ATL24_20181014100103_02410106_006_02_002_01.h5",
                     "type": "data",
-                    "uri": "s3://sliderule/data/C2C/ATL24_D2C_20181014100103_02410106_006_02_001_01.h5",
+                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014100103_02410106_006_02_002_01.h5",
                     "checksumType": "SHA256",
-                    "checksum": "11870045fde96dc82f8d5e3b679f64650b3334ddf19a12c1443706e1dd1b62ea",
-                    "size": 16308083
+                    "checksum": "07c932756060dbd8e661fdf7bf85b690dc4a2c886b3f2dba76ae760fd3b904f3",
+                    "size": 16295544
                 }
             ]
         }
@@ -110,7 +128,7 @@ for record in cnm_records:
 # Assume the role
 sts_client = boto3.client('sts')
 assumed_role = sts_client.assume_role(
-    RoleArn='arn:aws:iam::941673577314:role/nsidc-cumulus-uat_cross_provider_kinesis_role',
+    RoleArn='arn:aws:iam::024284894447:role/nsidc-ops-uat_cross_provider_kinesis_role',
     RoleSessionName='AssumeRoleSession')
 
 # Get temporary credentials

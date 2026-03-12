@@ -176,7 +176,7 @@ def worker(worker_id):
                     "url": args.url
                 }
             }
-            rsps = sliderule.source("execre", parms, session=session)
+            rsps = sliderule.source("execre", parms, session=session, sign=True)
             if rsps["status"]:
                 if not args.test:
                     with lock:
