@@ -1,138 +1,144 @@
-# NOTES:
-#   * The .aws/credentials file must be temporarily removed in order for this to work
-#     This is because the NSIDC role associated with the kinesis stream allows only the
-#     the silderules3 role associated with the EC2 instance to assume its role.
-
-
-# import boto3
-# import hashlib
-#
-# s3 = boto3.client("s3")
-#
-# response = s3.get_object(
-#     Bucket="my-bucket",
-#     Key="large-file.bin",
-# )
-#
-# sha256 = hashlib.sha256()
-#
-# for chunk in iter(lambda: response["Body"].read(1024 * 1024), b""):
-#     sha256.update(chunk)
-#
-# print(sha256.hexdigest())
-
+import argparse
+import sys
+from contextlib import suppress
 import boto3
+import hashlib
 import json
 import uuid
 from datetime import datetime
 
-## CNM records
-cnm_records = [
-    {
-        "version": 1.3,
-        "submissionTime": "",
-        "identifier": "",
-        "collection": "ATL24",
-        "provider": "ICESat-2_sliderule",
-        "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
-        "product": {
-            "name": "ATL24_20181014082645_02400106_006_02_002_01.h5",
-            "dataVersion": "002",
-            "files": [
-                {
-                    "name": "ATL24_20181014082645_02400106_006_02_002_01.iso.xml",
-                    "type": "metadata",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014082645_02400106_006_02_002_01.iso.xml",
-                    "checksumType": "SHA256",
-                    "checksum": "5f1c2a836eb2be1935aefb3387ad337e9fa0de359c847e626ee0ac1afd4febc5",
-                    "size": 21522
-                },
-                {
-                    "name": "ATL24_20181014082645_02400106_006_02_002_01.h5",
-                    "type": "data",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014082645_02400106_006_02_002_01.h5",
-                    "checksumType": "SHA256",
-                    "checksum": "c18c468c5e0060f94579ab33fce82fb3d634709bbed1192b5610fa4407904390",
-                    "size": 54988498
-                }
-            ]
-        }
-    },
-    {
-        "version": 1.3,
-        "submissionTime": "",
-        "identifier": "",
-        "collection": "ATL24",
-        "provider": "ICESat-2_sliderule",
-        "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
-        "product": {
-            "name": "ATL24_20181014083516_02400107_006_02_002_01.h5",
-            "dataVersion": "001",
-            "files": [
-                {
-                    "name": "ATL24_20181014083516_02400107_006_02_002_01.iso.xml",
-                    "type": "metadata",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014083516_02400107_006_02_002_01.iso.xml",
-                    "checksumType": "SHA256",
-                    "checksum": "a00f9319df8ceb373b606b84e2d16091fecc45f7a1e48bedb365a1cf70dfd80e",
-                    "size": 21141
-                },
-                {
-                    "name": "ATL24_20181014083516_02400107_006_02_002_01.h5",
-                    "type": "data",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014083516_02400107_006_02_002_01.h5",
-                    "checksumType": "SHA256",
-                    "checksum": "0091062f18011d8b37931e8f424e7f04281a91d555734eb5a7ca1a72701bf701",
-                    "size": 192568906
-                }
-            ]
-        }
-    },
-    {
-        "version": 1.3,
-        "submissionTime": "",
-        "identifier": "",
-        "collection": "ATL24",
-        "provider": "ICESat-2_sliderule",
-        "responseStreamArn": "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response",
-        "product": {
-            "name": "ATL24_20181014100103_02410106_006_02_002_01.h5",
-            "dataVersion": "001",
-            "files": [
-                {
-                    "name": "ATL24_20181014100103_02410106_006_02_002_01.iso.xml",
-                    "type": "metadata",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014100103_02410106_006_02_002_01.iso.xml",
-                    "checksumType": "SHA256",
-                    "checksum": "feca761b8d0573d789442176b022625a04e4cd33d49b60a47237b94159c0c9d1",
-                    "size": 21525
-                },
-                {
-                    "name": "ATL24_20181014100103_02410106_006_02_002_01.h5",
-                    "type": "data",
-                    "uri": "s3://sliderule/data/ATL24r2/ATL24_20181014100103_02410106_006_02_002_01.h5",
-                    "checksumType": "SHA256",
-                    "checksum": "07c932756060dbd8e661fdf7bf85b690dc4a2c886b3f2dba76ae760fd3b904f3",
-                    "size": 16295544
-                }
-            ]
-        }
-    }
-]
+# ###############################
+# Globals
+# ###############################
 
-# Update CNM records
-for record in cnm_records:
-    record["submissionTime"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000000")
-    record["identifier"] = str(uuid.uuid4())
+# Command Line Arguments
+parser = argparse.ArgumentParser(description="""ATL24""")
+parser.add_argument('--source',                 type=str,               default="s3://sliderule/data/ATL24r2")
+parser.add_argument('--xml_cache',              type=str,               default="data/xml_cache.txt")
+parser.add_argument('--h5_cache',               type=str,               default="data/h5_cache.txt")
+parser.add_argument('--cnm_cache',              type=str,               default="data/cnm_cache.txt")
+parser.add_argument('--collection',             type=str,               default="ATL24")
+parser.add_argument('--provider',               type=str,               default="ICESat-2_sliderule")
+parser.add_argument('--response_stream_arn',    type=str,               default="arn:aws:kinesis:us-west-2:790840705381:stream/nsidc-ops-prod-ATLAS_sliderule_response") # "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response"
+parser.add_argument('--assume_role',            type=str,               default="arn:aws:iam::790840705381:role/nsidc-ops-prod_cross_provider_kinesis_role") # "arn:aws:iam::024284894447:role/nsidc-ops-uat_cross_provider_kinesis_role"
+parser.add_argument('--notification_stream',    type=str,               default="nsidc-ops-prod-ATLAS_sliderule_notification") # "nsidc-ops-uat-ATLAS_sliderule_notification"
+parser.add_argument('--data_version',           type=str,               default="002")
+parser.add_argument('--partition_key',          type=str,               default="SlideRule")
+parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
+parser.add_argument('--verbose',                action='store_true',    default=False)
+args,_ = parser.parse_known_args()
+
+# create s3 client
+s3 = boto3.client("s3")
+
+# ###############################
+# Helper Functions
+# ###############################
+
+# Display Raw
+def display(s):
+    sys.stdout.write(s)
+    sys.stdout.flush()
+
+# Parse URL into Bucket and Subfolder
+def parse_url(url):
+    path = url.split("s3://")[-1]
+    bucket = path.split("/")[0]
+    subfolder = '/'.join(path.split("/")[1:])
+    return bucket, subfolder
+
+# Read Filenames from Cache
+def read_cache(cache):
+    data = {}
+    with suppress(FileNotFoundError):
+        with open(cache, "r") as file:
+            data = json.loads(file.read())
+            print(f"Found cache file <{cache}> with {len(data)} entries")
+    return data
+
+# Write Filenames to Cache
+def write_cache(cache, data):
+    with open(cache, "w") as file:
+        file.write(json.dumps(data))
+
+# List Files in Bucket
+def list_bucket(bucket, subfolder):
+    # read cache
+    xml_filenames = read_cache(args.xml_cache)
+    h5_filenames = read_cache(args.h5_cache)
+    if len(h5_filenames) == 0 or len(xml_filenames) == 0: # no files were cached
+        # clear cache
+        print(f"Clearing cache and listing contents of {args.source}")
+        xml_filenames = {}
+        h5_filenames = {}
+        # enumerate objects in s3 bucket
+        is_truncated = True
+        continuation_token = None
+        while is_truncated:
+            # make request
+            if continuation_token:
+                response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder, ContinuationToken=continuation_token)
+            else:
+                response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder)
+            # display status
+            display("#")
+            # parse contents
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    resource = obj['Key'].split("/")[-1]
+                    if resource.startswith(args.collection):
+                        if resource.endswith(".iso.xml"):
+                            xml_filenames[resource] = obj['Size']
+                        elif resource.endswith(".h5"):
+                            h5_filenames[resource] = obj['Size']
+            # check if more data is available
+            is_truncated = response['IsTruncated']
+            continuation_token = response.get('NextContinuationToken')
+        display("\n")
+        # write cache
+        write_cache(args.xml_cache, xml_filenames)
+        write_cache(args.h5_cache, h5_filenames)
+    # return filenames
+    return xml_filenames, h5_filenames
+
+# Calculate Checksum
+def calc_checksum(bucket, key):
+    if args.verbose:
+        print(f"Calculating checksum for s3://{bucket}/{key}")
+    response = s3.get_object(Bucket=bucket,Key=key)
+    sha256 = hashlib.sha256()
+    for chunk in iter(lambda: response["Body"].read(1024 * 1024), b""):
+        sha256.update(chunk)
+    return sha256.hexdigest()
+
+# ###############################
+# Main
+# ###############################
+
+# get granules to transfer
+bucket, subfolder = parse_url(args.source)
+xml_file_sizes, h5_file_sizes = list_bucket(bucket, subfolder)
+cnm_granules = read_cache(args.cnm_cache)
+granules_to_transfer = {}
+for h5_filename in h5_file_sizes:
+    granule = h5_filename.split(".h5")[0]
+    xml_filename = f"{granule}.iso.xml"
+    if (xml_filename in xml_file_sizes) and (granule not in cnm_granules):
+        granules_to_transfer[granule] = {
+            "xml": {
+                "size": xml_file_sizes[xml_filename],
+                "checksum": None # to be caclulated just prior to transfer
+            },
+            "h5": {
+                "size": h5_file_sizes[h5_filename],
+                "checksum": None # to be caclulated just prior to transfer
+            }
+        }
 
 # Assume the role
 sts_client = boto3.client('sts')
-assumed_role = sts_client.assume_role(
-    RoleArn='arn:aws:iam::024284894447:role/nsidc-ops-uat_cross_provider_kinesis_role',
-    RoleSessionName='AssumeRoleSession')
-
-# Get temporary credentials
-credentials = assumed_role['Credentials']
+assumed_role = sts_client.assume_role(RoleArn=args.assume_role, RoleSessionName='AssumeRoleSession')
+credentials = assumed_role['Credentials'] # get temporary credentials
 
 # Create kinesis client
 kinesis_client = boto3.client(
@@ -143,11 +149,60 @@ kinesis_client = boto3.client(
     aws_session_token=credentials['SessionToken'])
 
 # Post records to stream
-for record in cnm_records:
-    response = kinesis_client.put_record(
-        StreamName='nsidc-ops-uat-ATLAS_sliderule_notification', # 'nsidc-cumulus-uat-ATLAS_sliderule_notification'
-        Data=json.dumps(record),
-        PartitionKey="SlideRule")
-    print(f'{record["product"]["name"]}: {response}')
-
+records_transfered = 0
+records_success = 0
+records_failure = 0
+for granule in granules_to_transfer:
+    granules_to_transfer[granule]["xml"]["checksum"] = cnm_granules.get(granule, {}).get('xml', {}).get('checksum') or calc_checksum(bucket, f"{subfolder}/{granule}.iso.xml")
+    granules_to_transfer[granule]["h5"]["checksum"] = cnm_granules.get(granule, {}).get('xml', {}).get('checksum') or calc_checksum(bucket, f"{subfolder}/{granule}.h5")
+    record = {
+        "version": 1.3,
+        "submissionTime": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000000"),
+        "identifier": str(uuid.uuid4()),
+        "collection": args.collection,
+        "provider": args.provider,
+        "responseStreamArn": args.response_stream_arn,
+        "product": {
+            "name": f"{granule}.h5",
+            "dataVersion": args.data_version,
+            "files": [
+                {
+                    "name": f"{granule}.iso.xml",
+                    "type": "metadata",
+                    "uri": f"{args.source}/{granule}.iso.xml",
+                    "checksumType": "SHA256",
+                    "checksum": granules_to_transfer[granule]["xml"]["checksum"],
+                    "size": xml_file_sizes[f"{granule}.iso.xml"],
+                },
+                {
+                    "name": f"{granule}.h5",
+                    "type": "data",
+                    "uri": f"{args.source}/{granule}.h5",
+                    "checksumType": "SHA256",
+                    "checksum": granules_to_transfer[granule]["h5"]["checksum"],
+                    "size": h5_file_sizes[f"{granule}.h5"],
+                }
+            ]
+        }
+    }
+    if args.verbose:
+        print(f"[{records_transfered} of {args.transfer}] Posting {granule}:", json.dumps(record,indent=2))
+    if records_transfered < args.transfer:
+        records_transfered += 1
+        # post transfer record
+        response = kinesis_client.put_record(StreamName=args.notification_stream, Data=json.dumps(record), PartitionKey=args.partition_key)
+        if response == "test":
+            pass
+        elif response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            records_success += 1
+            # update cache
+            cnm_granules[granule] = granules_to_transfer[granule]
+            write_cache(args.cnm_cache, cnm_granules)
+            print(f"[{records_transfered} of {args.transfer}] {granule}: success")
+        else:
+            records_failure += 1
+            print(f"[{records_transfered} of {args.transfer}] {granule}: failure")
+    else:
+        print(f"Finished transfering {records_transfered} of {args.transfer} records: {records_success} succeeded, {records_failure} failed.")
+        sys.exit(0)
 

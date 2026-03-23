@@ -15,7 +15,7 @@ runner.unittest("ATL24 HDF5 Writer", function()
             anc_fields = {"index_ph", "index_seg"}
         }
     }, nil, "icesat2-atl24v1", "ATL24_20241107234251_08052501_006_01_001_01.h5")
-    local atl24h5   = h5.object(parms["asset"], parms["resource"])
+    local atl24h5   = h5coro.object(parms["asset"], parms["resource"])
     local granule   = icesat2.atl24granule(parms, atl24h5, "rspq")
     local gt1l      = icesat2.atl24x("gt1l", parms, atl24h5, "rspq")
     local status    = gt1l:waiton(10000, "rspq")

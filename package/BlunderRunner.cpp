@@ -105,9 +105,6 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
 {
     bool status = true;
 
-    // latch start of execution time
-    const double start = TimeLib::latchtime();
-
     // cast dataframe to ATL24 specific dataframe
     Atl24DataFrame& df = *dynamic_cast<Atl24DataFrame*>(dataframe);
 
@@ -134,7 +131,7 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
             break;
         }
 
-        //check only bathy photons should have changed
+        // check only bathy photons should have changed
         if(df.class_ph[i] != Atl24Fields::BATHYMETRY)
         {
             mlog(CRITICAL, "Attempting to cleanup photon that is not labelled bathymetry: [%ld] => %d", i, df.class_ph[i]);
@@ -155,7 +152,6 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
         delete relabeled;
     }
 
-    // update runtime and return success
-    updateRunTime(TimeLib::latchtime() - start);
+    // return success
     return status;
 }
