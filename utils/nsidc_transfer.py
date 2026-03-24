@@ -135,24 +135,26 @@ for h5_filename in h5_file_sizes:
             }
         }
 
-# Assume the role
-sts_client = boto3.client('sts')
-assumed_role = sts_client.assume_role(RoleArn=args.assume_role, RoleSessionName='AssumeRoleSession')
-credentials = assumed_role['Credentials'] # get temporary credentials
-
-# Create kinesis client
-kinesis_client = boto3.client(
-    'kinesis',
-    region_name='us-west-2',
-    aws_access_key_id=credentials['AccessKeyId'],
-    aws_secret_access_key=credentials['SecretAccessKey'],
-    aws_session_token=credentials['SessionToken'])
-
 # Post records to stream
+records_to_transfer = len(granules_to_transfer)
 records_transfered = 0
 records_success = 0
 records_failure = 0
 for granule in granules_to_transfer:
+
+    # Get kinesis client by assuming the role and getting credentials
+    if records_transfered % 1000 == 0:
+        sts_client = boto3.client('sts')
+        assumed_role = sts_client.assume_role(RoleArn=args.assume_role, RoleSessionName='AssumeRoleSession')
+        credentials = assumed_role['Credentials'] # get temporary credentials
+        kinesis_client = boto3.client(
+            'kinesis',
+            region_name='us-west-2',
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretAccessKey'],
+            aws_session_token=credentials['SessionToken'])
+
+    # Build record to post
     granules_to_transfer[granule]["xml"]["checksum"] = cnm_granules.get(granule, {}).get('xml', {}).get('checksum') or calc_checksum(bucket, f"{subfolder}/{granule}.iso.xml")
     granules_to_transfer[granule]["h5"]["checksum"] = cnm_granules.get(granule, {}).get('xml', {}).get('checksum') or calc_checksum(bucket, f"{subfolder}/{granule}.h5")
     record = {
@@ -185,6 +187,8 @@ for granule in granules_to_transfer:
             ]
         }
     }
+
+    # Post the record
     if args.verbose:
         print(f"[{records_transfered} of {args.transfer}] Posting {granule}:", json.dumps(record,indent=2))
     if records_transfered < args.transfer:
@@ -198,11 +202,11 @@ for granule in granules_to_transfer:
             # update cache
             cnm_granules[granule] = granules_to_transfer[granule]
             write_cache(args.cnm_cache, cnm_granules)
-            print(f"[{records_transfered} of {args.transfer}] {granule}: success")
+            print(f"[{records_transfered} of {records_to_transfer}] {granule}: success")
         else:
             records_failure += 1
-            print(f"[{records_transfered} of {args.transfer}] {granule}: failure")
+            print(f"[{records_transfered} of {records_to_transfer}] {granule}: failure")
     else:
-        print(f"Finished transfering {records_transfered} of {args.transfer} records: {records_success} succeeded, {records_failure} failed.")
+        print(f"Finished transfering {records_transfered} of {records_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
         sys.exit(0)
 
