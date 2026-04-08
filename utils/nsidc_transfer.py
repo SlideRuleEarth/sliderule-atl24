@@ -143,7 +143,7 @@ records_failure = 0
 for granule in granules_to_transfer:
 
     # Get kinesis client by assuming the role and getting credentials
-    if records_transfered % 1000 == 0:
+    if records_transfered % 500 == 0:
         sts_client = boto3.client('sts')
         assumed_role = sts_client.assume_role(RoleArn=args.assume_role, RoleSessionName='AssumeRoleSession')
         credentials = assumed_role['Credentials'] # get temporary credentials
