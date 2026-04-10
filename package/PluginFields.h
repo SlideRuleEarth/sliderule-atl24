@@ -37,14 +37,14 @@
  ******************************************************************************/
 
 #include "OsApi.h"
-#include "FieldDictionary.h"
+#include "FieldMap.h"
 #include "FieldElement.h"
 
 /******************************************************************************
  * CLASS
  ******************************************************************************/
 
-class PluginFields: public FieldDictionary
+class PluginFields: public FieldMap<Field>
 {
     public:
 

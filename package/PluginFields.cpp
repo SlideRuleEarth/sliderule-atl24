@@ -45,7 +45,7 @@
  * Constructor
  *----------------------------------------------------------------------------*/
 PluginFields::PluginFields(void):
-    FieldDictionary ({
+    FieldMap<Field> ({
         {"sliderule_version",       &slideruleVersion},
         {"sliderule_build",         &slideruleBuild},
         {"sliderule_environment",   &slideruleEnvironment},
