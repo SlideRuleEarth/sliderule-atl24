@@ -6,6 +6,7 @@ SLIDERULE ?= $(ROOT)/../sliderule
 ATL24 ?= $(ROOT)/../atl24_v2_algorithms
 BUCKET ?= s3://sliderule
 ECR ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
+MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
 
 all:
@@ -13,15 +14,15 @@ all:
 
 config: prep
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Release -DATL24DIR=$(ATL24) $(USERCFG) $(MAKECFG) $(ROOT)
 
 config-stage-debug: prep
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Debug -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Debug -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(MAKECFG) $(ROOT)
 
 config-stage-release: prep
 	cd $(BUILD) && \
-	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(ROOT)
+	cmake -DCMAKE_BUILD_TYPE=Release -DINSTALLDIR=$(SLIDERULE)/stage/sliderule -DATL24DIR=$(ATL24) $(USERCFG) $(MAKECFG) $(ROOT)
 
 install:
 	make -C $(BUILD) install

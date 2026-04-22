@@ -36,24 +36,25 @@
 #include <math.h>
 #include <float.h>
 
-#include "cleanup.h" // ATL24
+#include "kd_experiment.h" // ATL24
 
 #include "OsApi.h"
-#include "GeoLib.h"
+#include "TimeLib.h"
 #include "FieldElement.h"
-#include "BlunderRunner.h"
+#include "KdExperiment.h"
 #include "Icesat2Fields.h"
-#include "Atl24DataFrame.h"
+#include "BathyDataFrame.h"
+#include "BathyKd.h"
 
-using namespace ATL24::cleanup;
+using namespace ATL24::kd_experiment;
 using namespace ATL24::photon;
 
 /******************************************************************************
  * DATA
  ******************************************************************************/
 
-const char* BlunderRunner::LUA_META_NAME = "BlunderRunner";
-const struct luaL_Reg BlunderRunner::LUA_META_TABLE[] = {
+const char* KdExperiment::LUA_META_NAME = "KdExperiment";
+const struct luaL_Reg KdExperiment::LUA_META_TABLE[] = {
     {NULL,          NULL}
 };
 
@@ -64,18 +65,21 @@ const struct luaL_Reg BlunderRunner::LUA_META_TABLE[] = {
  /*----------------------------------------------------------------------------
  * luaCreate - create(<parms>)
  *----------------------------------------------------------------------------*/
-int BlunderRunner::luaCreate (lua_State* L)
+int KdExperiment::luaCreate (lua_State* L)
 {
     Icesat2Fields* _parms = NULL;
+    BathyKd* _kd = NULL;
 
     try
     {
         _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, 1, Icesat2Fields::OBJECT_TYPE));
-        return createLuaObject(L, new BlunderRunner(L, _parms));
+        _kd = dynamic_cast<BathyKd*>(getLuaObject(L, 2, BathyKd::OBJECT_TYPE));
+        return createLuaObject(L, new KdExperiment(L, _parms, _kd));
     }
     catch(const RunTimeException& e)
     {
         if(_parms) _parms->releaseLuaObject();
+        if(_kd) _kd->releaseLuaObject();
         mlog(e.level(), "Error creating %s: %s", OBJECT_TYPE, e.what());
         return returnLuaStatus(L, false);
     }
@@ -84,73 +88,91 @@ int BlunderRunner::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-BlunderRunner::BlunderRunner (lua_State* L, Icesat2Fields* _parms):
+KdExperiment::KdExperiment (lua_State* L, Icesat2Fields* _parms, BathyKd* _kd):
     GeoDataFrame::FrameRunner(L, LUA_META_NAME, LUA_META_TABLE),
-    parms(_parms)
+    parms(_parms),
+    kd(_kd)
 {
 }
 
 /*----------------------------------------------------------------------------
  * Destructor
  *----------------------------------------------------------------------------*/
-BlunderRunner::~BlunderRunner (void)
+KdExperiment::~KdExperiment (void)
 {
     if(parms) parms->releaseLuaObject();
+    if(kd) kd->releaseLuaObject();
 }
 
 /*----------------------------------------------------------------------------
  * run
  *----------------------------------------------------------------------------*/
-bool BlunderRunner::run (GeoDataFrame* dataframe)
+bool KdExperiment::run (GeoDataFrame* dataframe)
 {
     bool status = true;
 
     // cast dataframe to ATL24 specific dataframe
-    Atl24DataFrame& df = *dynamic_cast<Atl24DataFrame*>(dataframe);
+    BathyDataFrame& df = *dynamic_cast<BathyDataFrame*>(dataframe);
 
-    // convert dataframe to input structure of ATL24 v2 cleanup algorithm
+    // create new columns
+    FieldColumn<int>*                       class_ph    = new FieldColumn<int>;
+    FieldColumn<FieldArray<double,NUM_KD>>* kd          = new FieldColumn<FieldArray<double,NUM_KD>>;
+    FieldColumn<FieldArray<double,NUM_SR>>* sr          = new FieldColumn<FieldArray<double,NUM_SR>>;
+
+    // convert dataframe to algorithm input structure
     vector<Photon> p(df.length());
     for(size_t i = 0; i < static_cast<size_t>(df.length()); ++i)
     {
         // only the below members of the structure are used
-        p[i].x_atc = df.x_atc[i];
-        p[i].h_ph = df.ortho_h[i];
-        p[i].class_ph = df.class_ph[i];
+        p[i].gps_seconds    = TimeLib::sysex2gpstime(df.time_ns[i]);
+        p[i].lat_ph         = df.lat_ph[i];
+        p[i].lon_ph         = df.lon_ph[i];
+        p[i].x_atc          = df.x_atc[i];
+        p[i].h_ph           = df.ellipse_h[i];
+        p[i].geoid          = df.geoid_corr_h[i]; // is this the delta or the corrected height
+        p[i].quality_ph     = df.quality_ph[i];
+        p[i].spot           = df.spot.value;
     }
 
-    // execute ATL24 v2 cleanup algorithm
-    Params params;
-    const vector<size_t> q = do_cleanup(p, params);
-    for(size_t i: q)
+    // execute Kd Experiment
+    vector<Kd_experiment_Photon> results = run_experiment(p);
+    for(const Kd_experiment_Photon& kd_photon: results)
     {
-        // check valid photon
-        if(i >= static_cast<size_t>(df.length()))
-        {
-            mlog(CRITICAL, "Attempting to cleanup photon that does not exist: %ld >= %ld", i, df.length());
-            status = false;
-            break;
-        }
+        // add class_ph
+        class_ph->append(kd_photon.class_ph);
 
-        // check only bathy photons should have changed
-        if(df.class_ph[i] != Atl24Fields::BATHYMETRY)
-        {
-            mlog(CRITICAL, "Attempting to cleanup photon that is not labelled bathymetry: [%ld] => %d", i, df.class_ph[i]);
-            status = false;
-            break;
-        }
+        // add kd
+        FieldArray<double,NUM_KD> kd_row;
+        kd_row[0] = kd_photon.kd1;
+        kd_row[1] = kd_photon.kd2;
+        kd_row[2] = kd_photon.kd3;
+        kd_row[3] = kd_photon.kd4;
+        kd_row[4] = kd_photon.kd5;
+        kd_row[5] = kd_photon.kd6;
+        kd_row[6] = kd_photon.kd7;
+        kd_row[7] = kd_photon.kd8;
+        kd_row[8] = kd_photon.kd9;
+        kd_row[9] = kd_photon.kd10;
+        kd_row[10] = kd_photon.kd11;
+        kd_row[11] = kd_photon.kd12;
+        kd_row[12] = kd_photon.kd13;
+        kd_row[13] = kd_photon.kd14;
+        kd_row[14] = kd_photon.kd15;
+        kd->append(kd_row);
 
-        // change classification
-        df.class_ph[i] = Atl24Fields::UNCLASSIFIED;
-        df.low_confidence_flag[i] = 0;
+        // add sr
+        FieldArray<double,NUM_SR> sr_row;
+        sr_row[0] = kd_photon.sr1;
+        sr_row[1] = kd_photon.sr2;
+        sr_row[2] = kd_photon.sr3;
+        sr_row[3] = kd_photon.sr4;
+        sr->append(sr_row);
     }
 
-    // add metadata to dataframe
-    FieldElement<int64_t>* relabeled = new FieldElement<int64_t>(q.size());
-    if(!df.addMetaData("relabeled", relabeled, true))
-    {
-        mlog(CRITICAL, "Failed to add metadata to dataframe");
-        delete relabeled;
-    }
+    // add columns to dataframe
+    df.addExistingColumn("class_ph",    class_ph);
+    df.addExistingColumn("kd",          kd);
+    df.addExistingColumn("sr",          sr);
 
     // return success
     return status;

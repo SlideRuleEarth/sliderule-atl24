@@ -77,7 +77,7 @@ static void add_group(List<HdfLib::dataset_t>& datasets, const char* name)
     datasets.add(group);
 }
 
-static void add_variable(List<HdfLib::dataset_t>& datasets, const char* name, Field* field)
+static void add_variable(List<HdfLib::dataset_t>& datasets, const char* name, const Field* field)
 {
     long size = field->length() * field->getTypeSize();
     uint8_t* buffer = new uint8_t[size];
@@ -86,7 +86,7 @@ static void add_variable(List<HdfLib::dataset_t>& datasets, const char* name, Fi
     datasets.add(variable);
 }
 
-static void add_scalar(List<HdfLib::dataset_t>& datasets, const char* name, Field* field)
+static void add_scalar(List<HdfLib::dataset_t>& datasets, const char* name, const Field* field)
 {
     long size = field->length() * field->getTypeSize();
     uint8_t* buffer = new uint8_t[size];

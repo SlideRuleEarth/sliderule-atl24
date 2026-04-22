@@ -52,6 +52,7 @@ target_sources(atl24
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/KdExperiment.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/PluginFields.cpp
 )
 
@@ -74,6 +75,7 @@ install (
 install (
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24g2.lua
+        ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24kd.lua
     DESTINATION
         ${CONFDIR}/api
 )

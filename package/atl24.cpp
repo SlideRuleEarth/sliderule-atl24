@@ -38,6 +38,7 @@
 
 #include "Atl24Writer.h"
 #include "BlunderRunner.h"
+#include "KdExperiment.h"
 
 /******************************************************************************
  * DEFINES
@@ -72,10 +73,11 @@ int atl24_version (lua_State* L)
 int atl24_open (lua_State *L)
 {
     static const struct luaL_Reg atl24_functions[] = {
-        {"version",     atl24_version},
-        {"blunder",     BlunderRunner::luaCreate},
-        {"hdf5file",    Atl24Writer::luaCreate},
-        {NULL,          NULL}
+        {"version",         atl24_version},
+        {"blunder",         BlunderRunner::luaCreate},
+        {"kd_experiment",   KdExperiment::luaCreate},
+        {"hdf5file",        Atl24Writer::luaCreate},
+        {NULL,              NULL}
     };
 
     luaL_newlib(L, atl24_functions);
