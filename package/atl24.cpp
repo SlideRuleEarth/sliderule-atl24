@@ -37,7 +37,7 @@
 #include "Icesat2Fields.h"
 
 #include "Atl24Writer.h"
-#include "BlunderRunner.h"
+//#include "BlunderRunner.h"
 #include "KdExperiment.h"
 
 /******************************************************************************
@@ -74,7 +74,7 @@ int atl24_open (lua_State *L)
 {
     static const struct luaL_Reg atl24_functions[] = {
         {"version",         atl24_version},
-        {"blunder",         BlunderRunner::luaCreate},
+//        {"blunder",         BlunderRunner::luaCreate},
         {"kd_experiment",   KdExperiment::luaCreate},
         {"hdf5file",        Atl24Writer::luaCreate},
         {NULL,              NULL}
