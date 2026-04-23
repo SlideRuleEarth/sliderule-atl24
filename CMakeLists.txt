@@ -76,6 +76,12 @@ install (
 )
 install (
     FILES
+        ${ATL24DIR}/models/scbmld.json
+    DESTINATION
+        ${CONFDIR}
+)
+install (
+    FILES
         ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24g2.lua
         ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24kd.lua
     DESTINATION

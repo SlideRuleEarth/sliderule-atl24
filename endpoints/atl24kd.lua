@@ -25,7 +25,7 @@ local function main()
         local runners           = {atmo, kd_experiment}
         local dataframes        = {}
         for _, beam in ipairs(parms["beams"]) do
-            dataframes[beam] = bathy.dataframe(beam, parms, bathymask, atl03h5, atl09h5, _rqst.rspq)
+            dataframes[beam] = bathy.dataframe(beam, parms, bathymask, atl03h5, _rqst.rspq)
             if not dataframes[beam] then
                 userlog:alert(core.CRITICAL, core.RTE_FAILURE, string.format("request <%s> on %s failed to create bathy dataframe for beam %s", _rqst.rspq, resource, beam))
             end

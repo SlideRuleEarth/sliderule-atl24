@@ -135,7 +135,8 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
     }
 
     // execute Kd Experiment
-    vector<Kd_experiment_Photon> results = run_experiment(p);
+    const string scbmld_model = FString("%s%c%s", CONFDIR, PATH_DELIMETER, "scbmld.json").c_str();
+    vector<Kd_experiment_Photon> results = run_experiment(p, scbmld_model);
     for(const Kd_experiment_Photon& kd_photon: results)
     {
         // add class_ph
