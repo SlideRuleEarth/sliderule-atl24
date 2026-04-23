@@ -119,55 +119,63 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
     FieldColumn<FieldArray<double,NUM_KD>>* kd          = new FieldColumn<FieldArray<double,NUM_KD>>;
     FieldColumn<FieldArray<double,NUM_SR>>* sr          = new FieldColumn<FieldArray<double,NUM_SR>>;
 
-    // convert dataframe to algorithm input structure
-    vector<Photon> p(df.length());
-    for(size_t i = 0; i < static_cast<size_t>(df.length()); ++i)
+    try
     {
-        // only the below members of the structure are used
-        p[i].gps_seconds    = TimeLib::sysex2gpstime(df.time_ns[i]);
-        p[i].lat_ph         = df.lat_ph[i];
-        p[i].lon_ph         = df.lon_ph[i];
-        p[i].x_atc          = df.x_atc[i];
-        p[i].h_ph           = df.ellipse_h[i];
-        p[i].geoid          = df.geoid_corr_h[i]; // is this the delta or the corrected height
-        p[i].quality_ph     = df.quality_ph[i];
-        p[i].spot           = df.spot.value;
+        // convert dataframe to algorithm input structure
+        vector<Photon> p(df.length());
+        for(size_t i = 0; i < static_cast<size_t>(df.length()); ++i)
+        {
+            // only the below members of the structure are used
+            p[i].gps_seconds    = TimeLib::sysex2gpstime(df.time_ns[i]);
+            p[i].lat_ph         = df.lat_ph[i];
+            p[i].lon_ph         = df.lon_ph[i];
+            p[i].x_atc          = df.x_atc[i];
+            p[i].h_ph           = df.ellipse_h[i];
+            p[i].geoid          = df.geoid_corr_h[i]; // is this the delta or the corrected height
+            p[i].quality_ph     = df.quality_ph[i];
+            p[i].spot           = df.spot.value;
+        }
+
+        // execute Kd Experiment
+        const string scbmld_model = FString("%s%c%s", CONFDIR, PATH_DELIMETER, "scbmld.json").c_str();
+        vector<Kd_experiment_Photon> results = run_experiment(p, scbmld_model);
+        for(const Kd_experiment_Photon& kd_photon: results)
+        {
+            // add class_ph
+            class_ph->append(kd_photon.class_ph);
+
+            // add kd
+            FieldArray<double,NUM_KD> kd_row;
+            kd_row[0] = kd_photon.kd1;
+            kd_row[1] = kd_photon.kd2;
+            kd_row[2] = kd_photon.kd3;
+            kd_row[3] = kd_photon.kd4;
+            kd_row[4] = kd_photon.kd5;
+            kd_row[5] = kd_photon.kd6;
+            kd_row[6] = kd_photon.kd7;
+            kd_row[7] = kd_photon.kd8;
+            kd_row[8] = kd_photon.kd9;
+            kd_row[9] = kd_photon.kd10;
+            kd_row[10] = kd_photon.kd11;
+            kd_row[11] = kd_photon.kd12;
+            kd_row[12] = kd_photon.kd13;
+            kd_row[13] = kd_photon.kd14;
+            kd_row[14] = kd_photon.kd15;
+            kd->append(kd_row);
+
+            // add sr
+            FieldArray<double,NUM_SR> sr_row;
+            sr_row[0] = kd_photon.sr1;
+            sr_row[1] = kd_photon.sr2;
+            sr_row[2] = kd_photon.sr3;
+            sr_row[3] = kd_photon.sr4;
+            sr->append(sr_row);
+        }
     }
-
-    // execute Kd Experiment
-    const string scbmld_model = FString("%s%c%s", CONFDIR, PATH_DELIMETER, "scbmld.json").c_str();
-    vector<Kd_experiment_Photon> results = run_experiment(p, scbmld_model);
-    for(const Kd_experiment_Photon& kd_photon: results)
+    catch(const std::exception& e)
     {
-        // add class_ph
-        class_ph->append(kd_photon.class_ph);
-
-        // add kd
-        FieldArray<double,NUM_KD> kd_row;
-        kd_row[0] = kd_photon.kd1;
-        kd_row[1] = kd_photon.kd2;
-        kd_row[2] = kd_photon.kd3;
-        kd_row[3] = kd_photon.kd4;
-        kd_row[4] = kd_photon.kd5;
-        kd_row[5] = kd_photon.kd6;
-        kd_row[6] = kd_photon.kd7;
-        kd_row[7] = kd_photon.kd8;
-        kd_row[8] = kd_photon.kd9;
-        kd_row[9] = kd_photon.kd10;
-        kd_row[10] = kd_photon.kd11;
-        kd_row[11] = kd_photon.kd12;
-        kd_row[12] = kd_photon.kd13;
-        kd_row[13] = kd_photon.kd14;
-        kd_row[14] = kd_photon.kd15;
-        kd->append(kd_row);
-
-        // add sr
-        FieldArray<double,NUM_SR> sr_row;
-        sr_row[0] = kd_photon.sr1;
-        sr_row[1] = kd_photon.sr2;
-        sr_row[2] = kd_photon.sr3;
-        sr_row[3] = kd_photon.sr4;
-        sr->append(sr_row);
+        status = false;
+        mlog(CRITICAL, "Failed to run kd experiement on %s spot %d: %s", df.granule.value.c_str(), df.spot.value, e.what());
     }
 
     // add columns to dataframe
