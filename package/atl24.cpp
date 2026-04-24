@@ -55,10 +55,21 @@
  *----------------------------------------------------------------------------*/
 int atl24_version (lua_State* L)
 {
+    /* Check for Verbose */
+    bool verbose = false;
+    if(lua_isboolean(L, 1))
+    {
+        verbose = lua_toboolean(L, 1);
+    }
+
     /* Display Information on Terminal */
-    print2term("Version:    %s\n", BINID);
-    print2term("Build:      %s\n", BUILDINFO);
-    print2term("Algorithm:  %s\n", ALGOINFO);
+    if(verbose)
+    {
+        print2term("Package:    %s\n", LUA_ATL24_LIBNAME);
+        print2term("Version:    %s\n", BINID);
+        print2term("Build:      %s\n", BUILDINFO);
+        print2term("Algorithm:  %s\n", ALGOINFO);
+    }
 
     /* Return Information to Lua */
     lua_pushstring(L, BINID);

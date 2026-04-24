@@ -131,14 +131,13 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
             p[i].lon_ph         = df.lon_ph[i];
             p[i].x_atc          = df.x_atc[i];
             p[i].h_ph           = df.ellipse_h[i];
-            p[i].geoid          = df.geoid_corr_h[i]; // is this the delta or the corrected height
+            p[i].geoid          = df.ellipse_h[i] - df.geoid_corr_h[i];
             p[i].quality_ph     = df.quality_ph[i];
             p[i].spot           = df.spot.value;
         }
 
         // execute Kd Experiment
-        const string scbmld_model = FString("%s%c%s", CONFDIR, PATH_DELIMETER, "scbmld.json").c_str();
-        vector<Kd_experiment_Photon> results = run_experiment(p, scbmld_model);
+        vector<Kd_experiment_Photon> results = run_experiment(p);
         for(const Kd_experiment_Photon& kd_photon: results)
         {
             // add class_ph
