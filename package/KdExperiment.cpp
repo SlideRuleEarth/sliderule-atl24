@@ -178,9 +178,9 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
     }
 
     // add columns to dataframe
-    df.addExistingColumn("class_ph",    class_ph);
-    df.addExistingColumn("kd",          kd);
-    df.addExistingColumn("sr",          sr);
+    df.addExistingColumn("class_ph",    class_ph,   "photon classification");
+    df.addExistingColumn("kd",          kd,         "turbidity");
+    df.addExistingColumn("sr",          sr,         "sr");
 
     // return success
     return status;
