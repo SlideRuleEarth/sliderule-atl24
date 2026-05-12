@@ -1,17 +1,21 @@
 -------------------------------------------------------
+-- initialization
+-------------------------------------------------------
+local json          = require("json")
+local dataframe     = require("dataframe")
+local icesat2_utils = require("icesat2_utils")
+local bathy_utils   = require("bathy_utils")
+local rqst          = json.decode(arg[1])
+local parms         = bathy.parms(rqst["parms"], rqst["key_space"], "icesat2", rqst["resource"])
+local granule       = parms["granule"]
+local rdate         = string.format("%04d-%02d-%02dT00:00:00Z", granule["year"], granule["month"], granule["day"])
+local rgps          = time.gmt2gps(rdate)
+local channels      = 6 -- number of dataframes per resource
+
+-------------------------------------------------------
 -- main
 -------------------------------------------------------
 local function main()
-    local json          = require("json")
-    local dataframe     = require("dataframe")
-    local icesat2_utils = require("icesat2_utils")
-    local bathy_utils   = require("bathy_utils")
-    local rqst          = json.decode(arg[1])
-    local parms         = bathy.parms(rqst["parms"], rqst["key_space"], "icesat2", rqst["resource"])
-    local granule       = parms["granule"]
-    local rdate         = string.format("%04d-%02d-%02dT00:00:00Z", granule["year"], granule["month"], granule["day"])
-    local rgps          = time.gmt2gps(rdate)
-    local channels      = 6 -- number of dataframes per resource
     -- proxy request
     dataframe.proxy("atl24kd", parms, rqst["parms"], _rqst.rspq, channels, function(userlog)
         local resource          = parms["resource"]
@@ -39,10 +43,12 @@ end
 -------------------------------------------------------
 return {
     main = main,
+    parms = parms,
     name = "Kd Experiment Dataframe",
     description = "Run the Kd experiment and generate results (x-series)",
     logging = core.CRITICAL,
     roles = {},
     signed = false,
+    inputs = {"json"},
     outputs = {"binary", "arrow"}
 }

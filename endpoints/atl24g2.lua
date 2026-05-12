@@ -1,22 +1,26 @@
 -------------------------------------------------------
+-- initialization
+-------------------------------------------------------
+local json  = require("json")
+local rqst  = json.decode(arg[1])
+
+-- override atl24 request parameters
+rqst["parms"]["atl24"] = {
+    compact = false,
+    class_ph = {"unclassified", "bathymetry", "sea_surface"},
+    anc_fields = {"index_ph", "index_seg"}
+}
+
+-- create global objects
+local start_time    = time.gps() -- for timeout handling
+local userlog       = msg.publish(_rqst.rspq) -- for alerts
+local parms         = icesat2.parms(rqst["parms"], rqst["key_space"], "icesat2-atl24v1", rqst["resource"])
+local atl24h5       = h5.object(parms["asset"], parms["resource"])
+
+-------------------------------------------------------
 -- main
 -------------------------------------------------------
 local function main()
-    local json      = require("json")
-    local rqst      = json.decode(arg[1])
-
-    -- override atl24 request parameters
-    rqst["parms"]["atl24"] = {
-        compact = false,
-        class_ph = {"unclassified", "bathymetry", "sea_surface"},
-        anc_fields = {"index_ph", "index_seg"}
-    }
-
-    -- create global objects
-    local start_time    = time.gps() -- for timeout handling
-    local userlog       = msg.publish(_rqst.rspq) -- for alerts
-    local parms         = icesat2.parms(rqst["parms"], rqst["key_space"], "icesat2-atl24v1", rqst["resource"])
-    local atl24h5       = h5.object(parms["asset"], parms["resource"])
 
     -- create atl24 dataframes from release 01 granules
     local dataframes = {}
@@ -77,10 +81,12 @@ end
 -------------------------------------------------------
 return {
     main = main,
+    parms = parms,
     name = "ATL24 Version 2 Golden Dataframe",
     description = "Generate ATL24 version 2 bathymetry data using parameters supplied in the request (x-series)",
     logging = core.CRITICAL,
     roles = {},
     signed = false,
+    inputs = {"json"},
     outputs = {"binary"}
 }
