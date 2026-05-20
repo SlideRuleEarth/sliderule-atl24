@@ -36,6 +36,7 @@ prep:
 publish:
 	aws s3 cp $(BUILD)/atl24.so $(BUCKET)/plugins/
 	aws s3 cp endpoints/atl24g2.lua $(BUCKET)/plugins/api/
+	aws s3 cp endpoints/atl24kd.lua $(BUCKET)/plugins/api/
 
 tag:
 	echo $(VERSION) > $(ROOT)/version.txt
