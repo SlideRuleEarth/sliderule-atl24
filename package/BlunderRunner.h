@@ -34,7 +34,7 @@
 
 #include "OsApi.h"
 #include "GeoDataFrame.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 #include "Atl24DataFrame.h"
 
 /******************************************************************************
@@ -65,14 +65,14 @@ class BlunderRunner: public GeoDataFrame::FrameRunner
          * Methods
          *--------------------------------------------------------------------*/
 
-        BlunderRunner  (lua_State* L, Icesat2Fields* _parms);
+        BlunderRunner  (lua_State* L, Icesat2Parameters* _parms);
         ~BlunderRunner (void) override;
 
         /*--------------------------------------------------------------------
          * Data
          *--------------------------------------------------------------------*/
 
-        Icesat2Fields*  parms;
+        Icesat2Parameters*  parms;
 };
 
 #endif

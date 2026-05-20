@@ -22,9 +22,11 @@ set_target_properties (atl24 PROPERTIES PREFIX "")
 # Dependencies #
 find_package (Lua "5.3")
 find_package(xgboost REQUIRED)
+find_package(LibArchive REQUIRED)
 find_library(LIBUUID_LIBRARY libuuid.so)
 target_link_libraries (atl24 PUBLIC ${LIBUUID_LIBRARY})
 target_link_libraries(atl24 PUBLIC xgboost::xgboost)
+target_link_libraries(atl24 PUBLIC LibArchive::LibArchive)
 
 # Version Information #
 execute_process (COMMAND git --work-tree ${PROJECT_SOURCE_DIR} --git-dir ${PROJECT_SOURCE_DIR}/.git describe --abbrev --dirty --always --tags --long OUTPUT_VARIABLE BUILDINFO)
@@ -53,7 +55,7 @@ target_sources(atl24
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
-#        ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/KdExperiment.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/PluginFields.cpp
 )
@@ -76,7 +78,7 @@ install (
 )
 install (
     FILES
-        ${ATL24DIR}/models/scbmld.json
+        ${ATL24DIR}/models/atl24.tgz
     DESTINATION
         ${CONFDIR}
 )

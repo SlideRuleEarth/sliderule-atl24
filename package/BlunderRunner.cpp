@@ -42,7 +42,7 @@
 #include "GeoLib.h"
 #include "FieldElement.h"
 #include "BlunderRunner.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 #include "Atl24DataFrame.h"
 
 using namespace ATL24::cleanup;
@@ -66,11 +66,11 @@ const struct luaL_Reg BlunderRunner::LUA_META_TABLE[] = {
  *----------------------------------------------------------------------------*/
 int BlunderRunner::luaCreate (lua_State* L)
 {
-    Icesat2Fields* _parms = NULL;
+    Icesat2Parameters* _parms = NULL;
 
     try
     {
-        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, 1, Icesat2Fields::OBJECT_TYPE));
+        _parms = dynamic_cast<Icesat2Parameters*>(getLuaObject(L, 1, Icesat2Parameters::OBJECT_TYPE));
         return createLuaObject(L, new BlunderRunner(L, _parms));
     }
     catch(const RunTimeException& e)
@@ -84,7 +84,7 @@ int BlunderRunner::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-BlunderRunner::BlunderRunner (lua_State* L, Icesat2Fields* _parms):
+BlunderRunner::BlunderRunner (lua_State* L, Icesat2Parameters* _parms):
     GeoDataFrame::FrameRunner(L, LUA_META_NAME, LUA_META_TABLE),
     parms(_parms)
 {
@@ -146,7 +146,7 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
 
     // add metadata to dataframe
     FieldElement<int64_t>* relabeled = new FieldElement<int64_t>(q.size());
-    if(!df.addMetaData("relabeled", relabeled, true))
+    if(!df.addMetaData("relabeled", relabeled, "boolean on whether photon was relabeled as part of the cleanup", true))
     {
         mlog(CRITICAL, "Failed to add metadata to dataframe");
         delete relabeled;

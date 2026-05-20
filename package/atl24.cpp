@@ -34,7 +34,7 @@
  ******************************************************************************/
 
 #include "LuaEngine.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 
 #include "Atl24Writer.h"
 //#include "BlunderRunner.h"

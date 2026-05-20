@@ -41,7 +41,7 @@
 #include "LuaObject.h"
 #include "HdfLib.h"
 #include "FieldElement.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 #include "Atl24DataFrame.h"
 #include "Atl24Granule.h"
 
@@ -63,7 +63,7 @@ class Atl24Writer: public LuaObject
 
         static const char* RELEASE;
 
-        static const int NUM_BEAMS = Icesat2Fields::NUM_SPOTS;
+        static const int NUM_BEAMS = Icesat2Parameters::NUM_SPOTS;
         static const char* BEAMS[NUM_BEAMS];
 
         /*--------------------------------------------------------------------
@@ -84,7 +84,7 @@ class Atl24Writer: public LuaObject
          * Methods
          *--------------------------------------------------------------------*/
 
-        Atl24Writer  (lua_State* L, Icesat2Fields* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule);
+        Atl24Writer  (lua_State* L, Icesat2Parameters* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule);
         ~Atl24Writer (void) override;
 
         static int luaWriteFile (lua_State* L);
@@ -95,7 +95,7 @@ class Atl24Writer: public LuaObject
 
         FieldElement<string> release; // standard data product release number
 
-        Icesat2Fields* parms;
+        Icesat2Parameters* parms;
         Atl24DataFrame* dataframes[NUM_BEAMS];
         Atl24Granule* granule;
 };

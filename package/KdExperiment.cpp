@@ -42,7 +42,7 @@
 #include "TimeLib.h"
 #include "FieldElement.h"
 #include "KdExperiment.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 #include "BathyDataFrame.h"
 #include "BathyKd.h"
 
@@ -67,12 +67,12 @@ const struct luaL_Reg KdExperiment::LUA_META_TABLE[] = {
  *----------------------------------------------------------------------------*/
 int KdExperiment::luaCreate (lua_State* L)
 {
-    Icesat2Fields* _parms = NULL;
+    Icesat2Parameters* _parms = NULL;
     BathyKd* _kd = NULL;
 
     try
     {
-        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, 1, Icesat2Fields::OBJECT_TYPE));
+        _parms = dynamic_cast<Icesat2Parameters*>(getLuaObject(L, 1, Icesat2Parameters::OBJECT_TYPE));
         _kd = dynamic_cast<BathyKd*>(getLuaObject(L, 2, BathyKd::OBJECT_TYPE));
         return createLuaObject(L, new KdExperiment(L, _parms, _kd));
     }
@@ -88,10 +88,10 @@ int KdExperiment::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-KdExperiment::KdExperiment (lua_State* L, Icesat2Fields* _parms, BathyKd* _kd):
+KdExperiment::KdExperiment (lua_State* L, Icesat2Parameters* _parms, BathyKd* _kd):
     GeoDataFrame::FrameRunner(L, LUA_META_NAME, LUA_META_TABLE),
     parms(_parms),
-    kd(_kd)
+    viirsKd(_kd)
 {
 }
 
@@ -101,7 +101,7 @@ KdExperiment::KdExperiment (lua_State* L, Icesat2Fields* _parms, BathyKd* _kd):
 KdExperiment::~KdExperiment (void)
 {
     if(parms) parms->releaseLuaObject();
-    if(kd) kd->releaseLuaObject();
+    if(viirsKd) viirsKd->releaseLuaObject();
 }
 
 /*----------------------------------------------------------------------------
@@ -116,6 +116,7 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
 
     // create new columns
     FieldColumn<int>*                       class_ph    = new FieldColumn<int>;
+    FieldColumn<double>*                    viirs_kd    = new FieldColumn<double>;
     FieldColumn<FieldArray<double,NUM_KD>>* kd          = new FieldColumn<FieldArray<double,NUM_KD>>;
     FieldColumn<FieldArray<double,NUM_SR>>* sr          = new FieldColumn<FieldArray<double,NUM_SR>>;
 
@@ -137,7 +138,8 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
         }
 
         // execute Kd Experiment
-        vector<Kd_experiment_Photon> results = run_experiment(p);
+        FString model_filename("%s/atl24.tgz", CONFDIR);
+        vector<Kd_experiment_Photon> results = run_experiment(p, model_filename.c_str());
         for(const Kd_experiment_Photon& kd_photon: results)
         {
             // add class_ph
@@ -177,8 +179,16 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
         mlog(CRITICAL, "Failed to run kd experiement on %s spot %d: %s", df.granule.value.c_str(), df.spot.value, e.what());
     }
 
+    // add viirs kd
+    viirsKd->join(parms->readTimeout.value * 1000);
+    for(size_t i = 0; i < static_cast<size_t>(df.length()); i++)
+    {
+        viirs_kd->append(viirsKd->getKd(df.lon_ph[i], df.lat_ph[i]));
+    }
+
     // add columns to dataframe
     df.addExistingColumn("class_ph",    class_ph,   "photon classification");
+    df.addExistingColumn("viirs_kd",    viirs_kd,   "kd490 from VIIRS");
     df.addExistingColumn("kd",          kd,         "turbidity");
     df.addExistingColumn("sr",          sr,         "sr");
 

@@ -44,7 +44,7 @@
 #include "FieldColumn.h"
 #include "TimeLib.h"
 #include "Atl24DataFrame.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 
 /******************************************************************************
  * STATIC DATA
@@ -146,7 +146,7 @@ void Atl24Writer::init (void)
  *----------------------------------------------------------------------------*/
 int Atl24Writer::luaCreate (lua_State* L)
 {
-    Icesat2Fields* _parms = NULL;
+    Icesat2Parameters* _parms = NULL;
     Atl24DataFrame* _dataframes[NUM_BEAMS] = {NULL, NULL, NULL, NULL, NULL, NULL};
     Atl24Granule* _granule = NULL;
 
@@ -157,7 +157,7 @@ int Atl24Writer::luaCreate (lua_State* L)
         int granule_index = 3;
 
         /* Get Parameters */
-        _parms = dynamic_cast<Icesat2Fields*>(getLuaObject(L, parms_index, Icesat2Fields::OBJECT_TYPE));
+        _parms = dynamic_cast<Icesat2Parameters*>(getLuaObject(L, parms_index, Icesat2Parameters::OBJECT_TYPE));
 
         /* Get DataFrames */
         if(lua_istable(L, dataframe_table_index))
@@ -195,7 +195,7 @@ int Atl24Writer::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-Atl24Writer::Atl24Writer(lua_State* L, Icesat2Fields* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule):
+Atl24Writer::Atl24Writer(lua_State* L, Icesat2Parameters* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule):
     LuaObject(L, OBJECT_TYPE, LUA_META_NAME, LUA_META_TABLE),
     release(RELEASE),
     parms(_parms),
@@ -243,7 +243,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
     {
         /* Get Self */
         Atl24Writer* lua_obj = dynamic_cast<Atl24Writer*>(getLuaSelf(L, 1));
-        Icesat2Fields* parms = lua_obj->parms;
+        Icesat2Parameters* parms = lua_obj->parms;
         Atl24Granule& granule = *lua_obj->granule;
 
         /* Get Filename */
@@ -292,7 +292,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             for(long j = 0; j < df->time_ns.length(); j++)
             {
                 static const double ATLAS_LEAP_SECONDS = 18; // optimization based on the time period of ATLAS data at the time of ATL24 generation (2025)
-                double value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Fields::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
+                double value = (df->time_ns[j].nanoseconds / 1000000000.0) - (Icesat2Parameters::ATLAS_SDP_EPOCH_GPS + TimeLib::GPS_EPOCH_START - ATLAS_LEAP_SECONDS);
                 delta_time.append(value);
             }
             add_variable(datasets, "delta_time", &delta_time);

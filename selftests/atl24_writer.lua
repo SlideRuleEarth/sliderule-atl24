@@ -8,7 +8,7 @@ runner.authenticate({'nsidc-cloud'})
 -- Self Test --
 
 runner.unittest("ATL24 HDF5 Writer", function()
-    local parms = icesat2.parms({
+    local parms = icesat2.parms24({
         atl24 = {
             compact = false,
             class_ph = {"unclassified", "bathymetry", "sea_surface"},

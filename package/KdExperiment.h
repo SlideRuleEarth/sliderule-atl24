@@ -34,7 +34,7 @@
 
 #include "OsApi.h"
 #include "GeoDataFrame.h"
-#include "Icesat2Fields.h"
+#include "Icesat2Parameters.h"
 #include "BathyDataFrame.h"
 #include "BathyKd.h"
 
@@ -69,15 +69,15 @@ class KdExperiment: public GeoDataFrame::FrameRunner
          * Methods
          *--------------------------------------------------------------------*/
 
-        KdExperiment  (lua_State* L, Icesat2Fields* _parms, BathyKd* _kd);
+        KdExperiment  (lua_State* L, Icesat2Parameters* _parms, BathyKd* _kd);
         ~KdExperiment (void) override;
 
         /*--------------------------------------------------------------------
          * Data
          *--------------------------------------------------------------------*/
 
-        Icesat2Fields*  parms;
-        BathyKd*        kd;
+        Icesat2Parameters*  parms;
+        BathyKd*            viirsKd;
 };
 
 #endif
