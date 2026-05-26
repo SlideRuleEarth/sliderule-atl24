@@ -72,7 +72,7 @@ repeat
 
     -- wait for data to finish being read and deduplicated
     for beam, df in pairs(dataframes) do
-        print("Waiting for beam "..beam)
+        sys.log(core.CRITICAL, string.format("waiting for beam %s", beam))
         local status = df:finished(timeout)
         if status then
             table.insert(result["messages"], string.format("finished dataframe for beam %s", beam))
@@ -117,6 +117,7 @@ repeat
     end
 
     -- send file to s3
+    result["output"] = parms["output"]["path"]
     local status = core.send2user(arrow_filename, parms, "consoleq")
     if not status then
         table.insert(result["messages"], "failed to send dataframe")
