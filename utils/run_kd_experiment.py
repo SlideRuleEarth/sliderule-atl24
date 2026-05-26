@@ -7,6 +7,8 @@ from sliderule import sliderule
 
 # command line arguments
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
+parser.add_argument('--name',       type=str,               default="kd_experiment")
+parser.add_argument('--script',     type=str,               default="utils/kd_experiment.lua")
 parser.add_argument('--granule',    type=str,               default=None) # "ATL03_20241107234251_08052501_007_01.h5"
 parser.add_argument('--granules',   type=str,               default=None) # "data/atl03_granules_cycle_1.txt"
 parser.add_argument('--cycle',      type=int,               default=None) # 1
@@ -37,7 +39,7 @@ if args.submit:
         }
         granules = sliderule.source("earthdata", parms)
         local_cache_file = f'data/atl03_granules_cycle_{args.cycle}.txt'
-        print(f"Saving off cycle {args.cycle} to file {local_cache_file} with {len(granules)} entries")
+        print(f"Saving off cycle {args.cycle} to file {local_cache_file}")
         with open(local_cache_file, 'w') as file:
             for granule in granules:
                 file.write(f'{granule}\n')
@@ -45,15 +47,16 @@ if args.submit:
         print("Error: must supply granules to process")
         sys.exit(1)
     # submit jobs to runner
-    lua_script = open("kd_experiment.lua", "r").read()
-    rsps = session.runner.submit(name="kd_experiment", script=lua_script, args_list=granules, optional_args={"vcpus":4, "memory":32768})
+    print(f"Submitting job {args.name} using script {args.script} with {len(granules)} entries")
+    lua_script = open(args.script, "r").read()
+    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=granules, optional_args={"vcpus":4, "memory":32768})
     print("Submitted jobs!\n", rsps)
 
 # status jobs
 if args.status:
     # get progress of submitted jobs
     jobs_in_progress = session.runner.queue(job_state=["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING", "SUCCEEDED", "FAILED"])
-    print(json.dumps(jobs_in_progress["report"], indent=2))
+    print(json.dumps(jobs_in_progress, indent=2))
 
 # run results
 if args.run:
