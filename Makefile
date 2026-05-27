@@ -5,7 +5,7 @@ VERSION ?= latest
 SLIDERULE ?= $(ROOT)/../sliderule
 ATL24 ?= $(ROOT)/../atl24_v2_algorithms
 BUCKET ?= s3://sliderule
-ECR ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
+CONTAINER_REGISTRY ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
 MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
 
@@ -33,11 +33,6 @@ uninstall:
 prep:
 	mkdir -p $(BUILD)
 
-publish:
-	aws s3 cp $(BUILD)/atl24.so $(BUCKET)/plugins/
-	aws s3 cp endpoints/atl24g2.lua $(BUCKET)/plugins/api/
-	aws s3 cp endpoints/atl24kd.lua $(BUCKET)/plugins/api/
-
 tag:
 	echo $(VERSION) > $(ROOT)/version.txt
 	git add $(ROOT)/version.txt
@@ -48,25 +43,29 @@ tag:
 
 release: distclean tag config-stage-release all publish
 
-atl24d-lock:
-	cd docker && conda-lock -p linux-$(shell arch) -f environment.yml
-	cd docker && conda-lock render -p linux-$(shell arch)
-
 atl24d-docker:
 	-rm -Rf $(STAGE)
 	mkdir -p $(STAGE)
+	cd docker && conda-lock -p linux-$(shell arch) -f environment.yml
+	cd docker && conda-lock render -p linux-$(shell arch)
 	cp docker/Dockerfile $(STAGE)
 	cp docker/conda-* $(STAGE)
 	cp docker/runner.* $(STAGE)
-	cd $(STAGE) && docker build -t $(ECR)/atl24d:$(VERSION) .
+	cd $(STAGE) && docker build -t $(CONTAINER_REGISTRY)/atl24d:$(VERSION) .
 
 atl24d-push:
-	docker push $(ECR)/atl24d:$(VERSION)
+	docker push $(CONTAINER_REGISTRY)/atl24d:$(VERSION)
 
-atl24d-docker: atl24d-lock atl24d-docker atl24d-push
-
-database-export:
-	aws s3 cp data/atl24r2.db s3://sliderule/cf/
+atl24-docker:
+	-rm -Rf $(STAGE)
+	mkdir -p $(STAGE)
+	rsync -a $(ROOT) $(STAGE) --exclude build --exclude stage --exclude data
+	rsync -a $(SLIDERULE) $(STAGE) --exclude build --exclude stage
+	rsync -a $(ATL24) $(STAGE) --exclude build --exclude stage
+	cp docker/atl24/Dockerfile $(STAGE)
+	cp docker/atl24/docker-entrypoint.sh $(STAGE)
+	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:atl24 .
+	docker tag $(CONTAINER_REGISTRY)/sliderule:atl24 $(CONTAINER_REGISTRY)/sliderule:unstable
 
 clean:
 	- make -C $(BUILD) clean

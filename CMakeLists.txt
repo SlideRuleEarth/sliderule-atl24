@@ -44,6 +44,7 @@ target_compile_definitions (atl24 PUBLIC ALGOINFO="${ALGOINFO}")
 set (INSTALLDIR /usr/local CACHE STRING "Installation directory for library and executables")
 set (CONFDIR ${INSTALLDIR}/etc/sliderule)
 set (ATL24DIR ${INSTALLDIR} CACHE STRING "Location of ATL24 algorithm header-only library")
+set (SLIDERULEDIR ${INSTALLDIR} CACHE STRING "Location of SlideRule library headers")
 
 # Debug Configuration #
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -63,7 +64,7 @@ target_sources(atl24
 # Include Directories #
 target_include_directories (atl24
     PUBLIC
-        ${INSTALLDIR}/include/sliderule
+        ${SLIDERULEDIR}/include/sliderule
         ${ATL24DIR}/include
         ${LUA_INCLUDE_DIR}
         $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/package
