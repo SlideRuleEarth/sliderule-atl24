@@ -2,6 +2,7 @@ import sys
 import boto3
 import json
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from sliderule import sliderule, earthdata
 
 # command line arguments
@@ -52,7 +53,8 @@ if args.cycle:
         "max_resources": 100000
     }
     granules = sliderule.source("earthdata", parms)
-    for granule in granules:
+    print(f"Retrieved list of {len(granules)} granules to process")
+    def search_granule(granule):
         rgt = int(granule[21:25])
         cycle = int(granule[25:27])
         name_filter = f'*_{rgt:04d}{cycle:02d}??_*'
@@ -62,11 +64,17 @@ if args.cycle:
         }
         granule09 = earthdata.search(atl09_parms)
         if len(granule09) > 0:
-            arg = f"{granule},{granule09[0]}"
-            args_list.append(arg)
-            print(f"Appending {arg}")
-        else:
-            print(f"Skipping {granule}")
+            return f"{granule},{granule09[0]}"
+        return None
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = {executor.submit(search_granule, g): g for g in granules}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                args_list.append(result)
+                print(f"Appending {result}")
+            else:
+                print(f"Skipping {futures[future]}")
     local_cycle_file = f'data/atl03_granules_cycle_{args.cycle}.txt'
     print(f"Saving cycle {args.cycle} to file {local_cycle_file}")
     with open(local_cycle_file, 'w') as file:
