@@ -3,7 +3,7 @@ import boto3
 import json
 import argparse
 import geopandas as gpd
-from sliderule import sliderule
+from sliderule import sliderule, earthdata
 
 # command line arguments
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
@@ -46,55 +46,43 @@ if args.submit:
     else:
         print("Error: must supply granules to process")
         sys.exit(1)
+    # append ATL09 granule to each argument
+    args_list = []
+    for granule in granules:
+        rgt = int(granule[21:25])
+        cycle = int(granule[25:27])
+        name_filter = f'*_{rgt:04d}{cycle:02d}??_*'
+        atl09_parms = {
+            "asset": "icesat2-atl09",
+            "name_filter": name_filter
+        }
+        granule09 = earthdata.search(atl09_parms)
+        args_list.append(f"{granule},{granule09[0]}")
     # submit jobs to runner
-    print(f"Submitting job {args.name} using script {args.script} with {len(granules)} entries")
+    print(f"Submitting job {args.name} using script {args.script} with {len(args_list)} entries")
     lua_script = open(args.script, "r").read()
-    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=granules, optional_args={"vcpus":4, "memory":32768})
+    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=args_list, optional_args={"vcpus":4, "memory":32768})
     print("Submitted jobs!\n", rsps)
 
 # status jobs
 if args.status:
     # get progress of submitted jobs
-    jobs_in_progress = session.runner.queue(job_state=["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING", "SUCCEEDED", "FAILED"])
+    jobs_in_progress = session.runner.queue(job_name=args.name)
     print(json.dumps(jobs_in_progress, indent=2))
 
 # run results
 if args.run:
-    # create s3 session
     s3 = boto3.client("s3", region_name="us-west-2")
-    # list contents of an s3 bucket
-    def list_bucket(url):
-        filenames = []
-        bucket = url.split("s3://")[-1].split("/")[0]
-        prefix = "/".join(url.split("s3://")[-1].split("/")[1:])
-        is_truncated = True
-        continuation_token = None
-        while is_truncated:
-            # make request
-            if continuation_token:
-                response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, ContinuationToken=continuation_token)
-            else:
-                response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-            # parse contents
-            if 'Contents' in response:
-                for obj in response['Contents']:
-                    filenames.append(f"{bucket}/{obj['Key']}")
-            # check if more data is available
-            is_truncated = response['IsTruncated']
-            continuation_token = response.get('NextContinuationToken')
-        return filenames
-    # download and display run artifacts
-    filenames = list_bucket(args.run)
-    for filename in filenames:
-        bucket = filename.split("/")[0]
-        key = "/".join(filename.split("/")[1:])
-        local_file = f"/tmp/{filename.split("/")[-1]}"
-        print(f"\ndownloading s3://{filename} to {local_file}")
-        s3.download_file(bucket, key, local_file)
-        print(f"contents of {local_file}:")
-        with open(local_file, "r") as file:
-            contents = file.read()
-            print(contents)
+    def load_remote_file(bucket, key):
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        contents = obj["Body"].read().decode("utf-8")
+        return json.loads(contents)
+    bucket = args.run.split("s3://")[-1].split("/")[0]
+    prefix = "/".join(args.run.split("s3://")[-1].split("/")[1:])
+    results = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": {"0": ..., ...}, "environment": ...}
+    for item in results["args"]:
+        result = load_remote_file(bucket, f"{prefix}/result_{item}.json")
+        print(f"{item} =>", json.dumps(result, indent=2))
 
 
 ############################################################################################

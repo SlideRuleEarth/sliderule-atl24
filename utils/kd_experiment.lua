@@ -1,12 +1,11 @@
 -- initialization
 local json          = require("json")
 local aws_utils     = require("aws_utils")
-local icesat2_utils = require("icesat2_utils")
 local bathy_utils   = require("bathy_utils")
 
 -- pull out arguments
 local script = arg[1]
-local resource = arg[2]
+local resource, resource09 = arg[2]:match("([^,]+),([^,]+)")
 local timeout = 600 * 1000
 
 -- initialize results
@@ -45,9 +44,7 @@ repeat
     local bathymask         = bathy.mask()
     local atl03h5           = h5coro.object(parms["asset"], resource)
     local consoleq          = msg.subscribe("consoleq") -- prevents error posting to consoleq
-    local userlog           = msg.publish("consoleq")
-    local atl09_granule,_   = icesat2_utils.find_atl09_granule(parms, userlog)
-    local atl09h5           = h5coro.object("icesat2-atl09", atl09_granule)
+    local atl09h5           = h5coro.object("icesat2-atl09", resource09)
     local atmo              = icesat2.atmo(parms, atl09h5)
     local kd490             = bathy_utils.get_viirs(parms, rgps)
     local kd_experiment     = atl24.kd_experiment(parms, kd490)

@@ -6,8 +6,13 @@ SLIDERULE ?= $(ROOT)/../sliderule
 ATL24 ?= $(ROOT)/../atl24_v2_algorithms
 BUCKET ?= s3://sliderule
 CONTAINER_REGISTRY ?= 742127912612.dkr.ecr.us-west-2.amazonaws.com
+ENVVER ?= $(shell git describe --abbrev --dirty --always --tags --long)
+PROJECT_BUCKET = sliderule
+PROJECT_FOLDER = cf
+AWS_REGION = us-west-2
 MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
+CMD ?= /usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/kd_experiment.lua ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5 /tmp/result.json
 
 all:
 	make -j8 -C $(BUILD)
@@ -64,13 +69,30 @@ atl24-docker:
 	rsync -a $(ATL24) $(STAGE) --exclude build --exclude stage
 	cp docker/atl24/Dockerfile $(STAGE)
 	cp docker/atl24/docker-entrypoint.sh $(STAGE)
-	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:atl24 .
-	docker tag $(CONTAINER_REGISTRY)/sliderule:atl24 $(CONTAINER_REGISTRY)/sliderule:unstable
+	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:runner .
+
+atl24-run:
+	docker run \
+		--network host \
+		-v /data:/data \
+		-v $(ROOT):$(ROOT) \
+		-e IPV4=localhost \
+		-e LOG_FORMAT=FMT_TEXT \
+		-e ENVIRONMENT_VERSION=$(ENVVER) \
+		-e PROJECT_BUCKET=$(PROJECT_BUCKET) \
+		-e PROJECT_FOLDER=$(PROJECT_FOLDER) \
+		-e PROJECT_REGION=$(AWS_REGION) \
+		-e ORCHESTRATOR=http://127.0.0.1:8050 \
+		-e CLUSTER=localhost \
+		-e DOMAIN=localhost \
+		-e AMS=http://127.0.0.1:9082 \
+		-e CONTAINER_REGISTRY=$(CONTAINER_REGISTRY) \
+		--name atl24 --rm \
+		$(CONTAINER_REGISTRY)/sliderule:runner \
+		$(CMD)
 
 clean:
 	- make -C $(BUILD) clean
 
 distclean:
 	- rm -Rf $(BUILD)
-
-
