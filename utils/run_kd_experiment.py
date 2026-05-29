@@ -9,12 +9,13 @@ from sliderule import sliderule, earthdata
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
 parser.add_argument('--name',       type=str,               default="kd_experiment")
 parser.add_argument('--vcpus',      type=int,               default=4)
-parser.add_argument('--memory',     type=int,               default=8000)
+parser.add_argument('--memory',     type=int,               default=8192)
 parser.add_argument('--script',     type=str,               default="utils/kd_experiment.lua")
 parser.add_argument('--arg',        type=str,               default=None) # ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5
 parser.add_argument('--args',       type=str,               default=None) # data/atl03_granules_cycle_1.txt
-parser.add_argument('--submission', type=str,               default="data/kd_experiment_submission.txt")
-parser.add_argument('--outputs',    type=str,               default="data/kd_experiment_outputs.txt")
+parser.add_argument('--slice',      type=int, nargs=2,      default=[0, 10000])
+parser.add_argument('--submission', type=str,               default="/tmp/kd_experiment_submission.txt")
+parser.add_argument('--outputs',    type=str,               default="/tmp/kd_experiment_outputs.txt")
 parser.add_argument('--cycle',      type=int,               default=None) # 1
 parser.add_argument('--results',    type=str,               default=None) # "run url"
 parser.add_argument('--submit',     action='store_true',    default=False)
@@ -39,9 +40,10 @@ if args.submit:
         print("Error: must supply arguments to process")
         sys.exit(1)
     # submit jobs to runner
+    args_list = args_list[args.slice[0]:args.slice[1]]
     print(f"Submitting job {args.name} using script {args.script} with {len(args_list)} entries")
     lua_script = open(args.script, "r").read()
-    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
+    rsps = session.runner.submit(name=args.name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
     print(f"Saving job submission to {args.submission}", rsps)
     with open(args.submission, 'w') as file:
         file.write(f'{json.dumps(rsps, indent=2)}')
@@ -86,7 +88,9 @@ if args.cycle:
 # status jobs
 if args.status:
     # get progress of submitted jobs
-    jobs_in_progress = session.runner.queue(job_name=args.name)
+    with open(args.submission) as file:
+        submission = json.loads(file.read())
+    jobs_in_progress = session.runner.queue(name=submission["name"], job_id=submission["job_id"])
     print(json.dumps(jobs_in_progress["report"], indent=2))
 
 # run results
@@ -99,15 +103,16 @@ if args.results:
         return json.loads(contents)
     bucket = args.results.split("s3://")[-1].split("/")[0]
     prefix = "/".join(args.results.split("s3://")[-1].split("/")[1:])
-    results = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": {"0": ..., ...}, "environment": ...}
-    for item in results["args"]:
+    results = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
+    args_list = load_remote_file(bucket, results["args"])
+    for i in range(len(args_list)):
         try:
-            result = load_remote_file(bucket, f"{prefix}/result_{item}.json")
+            result = load_remote_file(bucket, f"{prefix}/result{i}.json")
             output = "output" in result and result["output"] or result
             outputs.append(output)
-            print(f"{item} =>", json.dumps(result, indent=2))
+            print(f"{args_list[i]} =>", json.dumps(result, indent=2))
         except Exception as e:
-            print(f"{item} =>", {e})
+            print(f"{i} =>", {e})
     print(f"Saving outputs to {args.outputs}")
     with open(args.outputs, 'w') as file:
         for output in outputs:
