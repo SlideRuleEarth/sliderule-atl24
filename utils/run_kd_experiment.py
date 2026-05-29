@@ -8,6 +8,8 @@ from sliderule import sliderule, earthdata
 # command line arguments
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
 parser.add_argument('--name',       type=str,               default="kd_experiment")
+parser.add_argument('--vcpus',      type=int,               default=4)
+parser.add_argument('--memory',     type=int,               default=8000)
 parser.add_argument('--script',     type=str,               default="utils/kd_experiment.lua")
 parser.add_argument('--arg',        type=str,               default=None) # ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5
 parser.add_argument('--args',       type=str,               default=None) # data/atl03_granules_cycle_1.txt
@@ -39,7 +41,7 @@ if args.submit:
     # submit jobs to runner
     print(f"Submitting job {args.name} using script {args.script} with {len(args_list)} entries")
     lua_script = open(args.script, "r").read()
-    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=args_list, optional_args={"vcpus":4, "memory":32768})
+    rsps = session.runner.submit(name=args.name, script=lua_script, args_list=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
     print(f"Saving job submission to {args.submission}", rsps)
     with open(args.submission, 'w') as file:
         file.write(f'{json.dumps(rsps, indent=2)}')
@@ -85,7 +87,7 @@ if args.cycle:
 if args.status:
     # get progress of submitted jobs
     jobs_in_progress = session.runner.queue(job_name=args.name)
-    print(json.dumps(jobs_in_progress, indent=2))
+    print(json.dumps(jobs_in_progress["report"], indent=2))
 
 # run results
 if args.results:

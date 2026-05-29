@@ -2,33 +2,41 @@
 local json          = require("json")
 local aws_utils     = require("aws_utils")
 local bathy_utils   = require("bathy_utils")
-
--- pull out arguments
-local script = arg[1]
-local resource, resource09 = arg[2]:match("([^,]+),([^,]+)")
-local timeout = 600 * 1000
-
--- initialize results
-local result = {
-    info = string.format("executing %s, resource=%s, timeout=%d ms", script, resource, timeout),
-    status = true,
-    messages = {}
-}
-
--- request structure
-local rqst = {
-    ["atl09_fields"] = {
-        "low_rate/met_v10m",
-        "low_rate/met_u10m"
-    },
-    ["output"] = {
-        ["asset"] = "sliderule-stage",
-        ["format"] = "geoparquet",
-        ["path"] = string.format("%s.kd.v4.parquet", resource)
-    }
-}
+local timeout       = 600 * 1000
+local result        = { status = true, messages = {} }
 
 repeat
+
+    -- check global arguments
+    if not Arguments then
+        table.insert(result["messages"], "no argument supplied")
+        result["status"] = false
+        break
+    end
+
+    -- status arguments
+    local resource, resource09 = Arguments:match("([^,]+),([^,]+)")
+    if not resource or not resource09 then
+        table.insert(result["messages"], "failed to get arguments")
+        result["status"] = false
+        break
+    else
+        table.insert(result["messages"], string.format("processing resource=%s, timeout=%d ms", resource, timeout))
+    end
+
+    -- request structure
+    local rqst = {
+        ["atl09_fields"] = {
+            "low_rate/met_v10m",
+            "low_rate/met_u10m"
+        },
+        ["output"] = {
+            ["asset"] = "sliderule-stage",
+            ["format"] = "geoparquet",
+            ["path"] = string.format("%s.kd.v4.parquet", resource)
+        }
+    }
+
     -- wait for NSIDC credentials
     if not aws_utils.wait_credentials("nsidc-cloud") then
         table.insert(result["messages"], "failed to get NSIDC credentials")
