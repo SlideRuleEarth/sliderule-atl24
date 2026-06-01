@@ -3,7 +3,7 @@ local json          = require("json")
 local aws_utils     = require("aws_utils")
 local bathy_utils   = require("bathy_utils")
 local timeout       = 600 * 1000
-local result        = { status = true, messages = {} }
+local result        = { status = true, start = time.latch(), messages = {} }
 
 repeat
 
@@ -132,4 +132,5 @@ repeat
 until true
 
 -- return results
+result["stop"] = time.latch()
 return json.encode(result), true

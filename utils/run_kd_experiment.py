@@ -9,7 +9,7 @@ from sliderule import sliderule, earthdata
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
 parser.add_argument('--name',       type=str,               default="kd_experiment")
 parser.add_argument('--vcpus',      type=int,               default=4)
-parser.add_argument('--memory',     type=int,               default=8192)
+parser.add_argument('--memory',     type=int,               default=8000)
 parser.add_argument('--script',     type=str,               default="utils/kd_experiment.lua")
 parser.add_argument('--arg',        type=str,               default=None) # ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5
 parser.add_argument('--args',       type=str,               default=None) # data/atl03_granules_cycle_1.txt
@@ -56,6 +56,7 @@ if args.cycle:
         "cycle": args.cycle,
         "max_resources": 100000
     }
+    print(f"Requesting granules from CMR for cycle {parms["cycle"]}")
     granules = sliderule.source("earthdata", parms)
     print(f"Retrieved list of {len(granules)} granules to process")
     def search_granule(granule):
@@ -70,7 +71,7 @@ if args.cycle:
         if len(granule09) > 0:
             return f"{granule},{granule09[0]}"
         return None
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=30) as executor:
         futures = {executor.submit(search_granule, g): g for g in granules}
         for future in as_completed(futures):
             result = future.result()
