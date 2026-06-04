@@ -56,7 +56,7 @@ class KdExperiment: public GeoDataFrame::FrameRunner
         static const int NUM_KD = 15;
         static const int NUM_SR = 4;
 
-        static const long DEFAULT_SERIALIZE_THRESHOLD = 100000;
+        static const long DEFAULT_SERIALIZE_THRESHOLD = 500000;
 
         /*--------------------------------------------------------------------
          * Methods

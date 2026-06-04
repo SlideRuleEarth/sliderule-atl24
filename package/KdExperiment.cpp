@@ -74,7 +74,7 @@ int KdExperiment::luaCreate (lua_State* L)
     {
         _parms = dynamic_cast<Icesat2Parameters*>(getLuaObject(L, 1, Icesat2Parameters::OBJECT_TYPE));
         _kd = dynamic_cast<BathyKd*>(getLuaObject(L, 2, BathyKd::OBJECT_TYPE));
-        const long _serialize_threshold = getLuaInteger(L, 3, true, DEFAULT_SERIALIZE_THRESHOLD)
+        const long _serialize_threshold = getLuaInteger(L, 3, true, DEFAULT_SERIALIZE_THRESHOLD);
         return createLuaObject(L, new KdExperiment(L, _parms, _kd, _serialize_threshold));
     }
     catch(const RunTimeException& e)
@@ -124,7 +124,7 @@ bool KdExperiment::run (GeoDataFrame* dataframe)
 
     // determine serialization
     const bool serialize = df.length() > serializeThreshold;
-    mlog(INFO, "Running Kd experiment on spot %d in %s mode", df.spot.value, serialize ? "serial", "parallel");
+    mlog(INFO, "Running Kd experiment on spot %d in %s mode", df.spot.value, serialize ? "serial" : "parallel");
 
     try
     {
