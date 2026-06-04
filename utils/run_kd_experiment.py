@@ -17,7 +17,7 @@ parser.add_argument('--slice',      type=int, nargs=2,      default=[0, 10000])
 parser.add_argument('--submission', type=str,               default="/tmp/kd_experiment_submission.txt")
 parser.add_argument('--outputs',    type=str,               default="/tmp/kd_experiment_outputs.txt")
 parser.add_argument('--cycle',      type=int,               default=None) # 1
-parser.add_argument('--results',    type=str,               default=None) # "run url"
+parser.add_argument('--results',    action='store_true',    default=False)
 parser.add_argument('--submit',     action='store_true',    default=False)
 parser.add_argument('--status',     action='store_true',    default=False)
 args,_ = parser.parse_known_args()
@@ -97,13 +97,15 @@ if args.status:
 # run results
 if args.results:
     outputs = []
+    with open(args.submission) as file:
+        submission = json.loads(file.read())
     s3 = boto3.client("s3", region_name="us-west-2")
     def load_remote_file(bucket, key):
         obj = s3.get_object(Bucket=bucket, Key=key)
         contents = obj["Body"].read().decode("utf-8")
         return json.loads(contents)
-    bucket = args.results.split("s3://")[-1].split("/")[0]
-    prefix = "/".join(args.results.split("s3://")[-1].split("/")[1:])
+    bucket = submission["run_url"].split("s3://")[-1].split("/")[0]
+    prefix = "/".join(submission["run_url"].split("s3://")[-1].split("/")[1:])
     results = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
     args_list = load_remote_file(bucket, results["args"])
     for i in range(len(args_list)):

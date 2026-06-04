@@ -2,8 +2,9 @@
 local json          = require("json")
 local aws_utils     = require("aws_utils")
 local bathy_utils   = require("bathy_utils")
+local _, build      = sys.version()
 local timeout       = 600 * 1000
-local result        = { status = true, start = time.latch(), messages = {} }
+local result        = { status = true, build = build, start = time.latch(), messages = {} }
 
 repeat
 

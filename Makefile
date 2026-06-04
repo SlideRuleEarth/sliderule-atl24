@@ -12,7 +12,7 @@ PROJECT_FOLDER = cf
 AWS_REGION = us-west-2
 MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
-CMD ?= /usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/kd_experiment.lua ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5 /data/kd
+CMD ?= /usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/kd_experiment.lua ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5 /tmp
 
 all:
 	make -j8 -C $(BUILD)

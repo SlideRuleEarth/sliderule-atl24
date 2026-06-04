@@ -56,6 +56,8 @@ class KdExperiment: public GeoDataFrame::FrameRunner
         static const int NUM_KD = 15;
         static const int NUM_SR = 4;
 
+        static const long DEFAULT_SERIALIZE_THRESHOLD = 100000;
+
         /*--------------------------------------------------------------------
          * Methods
          *--------------------------------------------------------------------*/
@@ -69,7 +71,7 @@ class KdExperiment: public GeoDataFrame::FrameRunner
          * Methods
          *--------------------------------------------------------------------*/
 
-        KdExperiment  (lua_State* L, Icesat2Parameters* _parms, BathyKd* _kd);
+        KdExperiment  (lua_State* L, Icesat2Parameters* _parms, BathyKd* _kd, long _serialize_threshold);
         ~KdExperiment (void) override;
 
         /*--------------------------------------------------------------------
@@ -78,6 +80,8 @@ class KdExperiment: public GeoDataFrame::FrameRunner
 
         Icesat2Parameters*  parms;
         BathyKd*            viirsKd;
+        long                serializeThreshold;
+        Mutex               experiment;
 };
 
 #endif
