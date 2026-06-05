@@ -34,7 +34,8 @@ repeat
         ["output"] = {
             ["asset"] = "sliderule-stage",
             ["format"] = "geoparquet",
-            ["path"] = string.format("%s.kd.v4.parquet", resource)
+            ["path"] = string.format("%s.kd.v4.parquet", resource),
+            ["with_checksum"] = true
         }
     }
 
