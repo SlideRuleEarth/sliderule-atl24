@@ -51,35 +51,33 @@ if args.submit:
 # create cycle file
 if args.cycle:
     args_list = []
-    parms = {
+    print(f"Requesting ATL03 granules from CMR for cycle {args.cycle}")
+    atl03_granules = sliderule.source("earthdata", {
         "asset": "icesat2",
         "cycle": args.cycle,
         "max_resources": 100000
-    }
-    print(f"Requesting granules from CMR for cycle {parms["cycle"]}")
-    granules = sliderule.source("earthdata", parms)
-    print(f"Retrieved list of {len(granules)} granules to process")
-    def search_granule(granule):
+    })
+    print(f"Retrieved list of {len(atl03_granules)} granules to process")
+    print(f"Requesting ATL09 granules from CMR for cycle {args.cycle}")
+    atl09_granules = sliderule.source("earthdata", {
+        "asset": "icesat2-atl09",
+        "cycle": args.cycle,
+        "max_resources": 100000
+    })
+    print(f"Retrieved list of {len(atl09_granules)} granules to process")
+    atl09_table = {cycle: {} for cycle in range(100)}
+    for granule in atl09_granules:
         rgt = int(granule[21:25])
         cycle = int(granule[25:27])
-        name_filter = f'*_{rgt:04d}{cycle:02d}??_*'
-        atl09_parms = {
-            "asset": "icesat2-atl09",
-            "name_filter": name_filter
-        }
-        granule09 = earthdata.search(atl09_parms)
-        if len(granule09) > 0:
-            return f"{granule},{granule09[0]}"
-        return None
-    with ThreadPoolExecutor(max_workers=30) as executor:
-        futures = {executor.submit(search_granule, g): g for g in granules}
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                args_list.append(result)
-                print(f"Appending {result}")
-            else:
-                print(f"Skipping {futures[future]}")
+        atl09_table[cycle][rgt] = granule
+    for granule in atl03_granules:
+        rgt = int(granule[21:25])
+        cycle = int(granule[25:27])
+        try:
+            atl09_granule = atl09_table[cycle][rgt]
+            args_list.append(f"{granule},{atl09_granule}")
+        except Exception as e:
+            print(f"Skipping granule {granule}: {e}")
     local_cycle_file = f'data/atl03_granules_cycle_{args.cycle}.txt'
     print(f"Saving cycle {args.cycle} to file {local_cycle_file}")
     with open(local_cycle_file, 'w') as file:
