@@ -52,7 +52,7 @@ parser.add_argument('--input_files',        type=str,               default=None
 parser.add_argument('--url',                type=str,               default="s3://sliderule-public")
 parser.add_argument('--retries',            type=int,               default=3)
 parser.add_argument('--report_only',        action='store_true',    default=False)
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # Initialize Constants
 RELEASE = "001"

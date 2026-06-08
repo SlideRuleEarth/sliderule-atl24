@@ -18,7 +18,7 @@ parser.add_argument('--time_to_live',       type=int,               default=600)
 parser.add_argument('--before_dir',         type=str,               default="/data/test_cleanup/before")
 parser.add_argument('--after_dir',          type=str,               default="/data/test_cleanup/after")
 parser.add_argument('--test_run',           action='store_true',    default=False) # exit after first test
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 if args.organization == "None":
     args.organization = None

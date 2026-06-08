@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser(description="""ATL24""")
 parser.add_argument('--cycles', type=int, nargs='+', default=[])
 parser.add_argument('--max_resources', type=int, default=100000)
 parser.add_argument('--output_dir', type=str, default="data")
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 for cycle in args.cycles:
     parms = {

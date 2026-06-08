@@ -26,7 +26,7 @@ parser.add_argument('--data_version',           type=str,               default=
 parser.add_argument('--partition_key',          type=str,               default="SlideRule")
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--verbose',                action='store_true',    default=False)
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # create s3 client
 s3 = boto3.client("s3")

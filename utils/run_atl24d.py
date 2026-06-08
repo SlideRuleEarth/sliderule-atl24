@@ -24,7 +24,7 @@ parser.add_argument('--test',               action='store_true',    default=Fals
 parser.add_argument('--reprocess_errors',   action='store_true',    default=False)
 parser.add_argument("--release" ,           type=str,               default="002")
 parser.add_argument("--version" ,           type=str,               default="01")
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # Initialize Organization
 if args.organization == "None":

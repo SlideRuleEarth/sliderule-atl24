@@ -19,7 +19,7 @@ parser.add_argument('--url_v1',         type=str,               default="s3://sl
 parser.add_argument("--loglvl" ,        type=str,               default="CRITICAL")
 parser.add_argument("--cores",          type=int,               default=os.cpu_count())
 parser.add_argument("--test" ,          type=str,               default=None) # ATL24_20181120020325_08010106_006_02_002_01.h5
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # ################################################
 # Constants

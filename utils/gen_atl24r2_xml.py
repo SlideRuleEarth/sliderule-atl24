@@ -14,7 +14,7 @@ parser.add_argument('--concurrency',        type=int,               default=1)
 parser.add_argument("--release" ,           type=str,               default="002")
 parser.add_argument("--version" ,           type=str,               default="01")
 parser.add_argument('--report_only',        action='store_true',    default=False)
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # Display Helper Function
 def display(s):

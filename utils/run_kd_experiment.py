@@ -20,7 +20,7 @@ parser.add_argument('--cycle',      type=int,               default=None) # 1
 parser.add_argument('--results',    action='store_true',    default=False)
 parser.add_argument('--submit',     action='store_true',    default=False)
 parser.add_argument('--status',     action='store_true',    default=False)
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 # create runner session and authentiate
 session = sliderule.create_session(verbose=True)
