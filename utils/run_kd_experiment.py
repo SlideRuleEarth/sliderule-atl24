@@ -7,7 +7,7 @@ from sliderule import sliderule, earthdata
 
 # command line arguments
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
-parser.add_argument('--name',       type=str,               default="kd_experiment")
+parser.add_argument('--name',       type=str,               default=None)
 parser.add_argument('--vcpus',      type=int,               default=4)
 parser.add_argument('--memory',     type=int,               default=16000)
 parser.add_argument('--script',     type=str,               default="utils/kd_experiment.lua")
@@ -20,6 +20,7 @@ parser.add_argument('--cycle',      type=int,               default=None) # 1
 parser.add_argument('--results',    action='store_true',    default=False)
 parser.add_argument('--submit',     action='store_true',    default=False)
 parser.add_argument('--status',     action='store_true',    default=False)
+parser.add_argument('--list_files', action='store_true',    default=False)
 args = parser.parse_args()
 
 # create runner session and authentiate
@@ -28,6 +29,10 @@ session.authenticate() # gives privileges to access SlideRule Runner
 
 # submit jobs
 if args.submit:
+    # check name supplied
+    if not args.name:
+        print("Error: must supply a name for the job")
+        sys.exit(1)
     # get list of granules
     if args.arg:
         args_list = [args.arg]
@@ -84,7 +89,7 @@ if args.cycle:
         for arg in args_list:
             file.write(f'{arg}\n')
 
-# status jobs
+# status last job submitted
 if args.status:
     # get progress of submitted jobs
     with open(args.submission) as file:
@@ -119,17 +124,31 @@ if args.results:
         for output in outputs:
             file.write(f'{output}\n')
 
-
-############################################################################################
-# session = sliderule.create_session(domain="localhost", cluster=None, verbose=True)
-#
-# gdf = sliderule.run("atl24kd", {
-#     "atl09_fields": ["low_rate/met_v10m", "low_rate/met_u10m"],
-#     "output": {
-#         "format": "geoparquet",
-#         "path": "ATL03_20241107234251_08052501_007_01_kd_v4.parquet",
-#         "open_on_complete": True
-#     }
-# }, resources=["ATL03_20241107234251_08052501_007_01.h5"], session=session)
-#
-# print(gdf)
+# List Files in Bucket
+if args.list_files:
+    data_files = {}
+    s3 = boto3.client("s3")
+    is_truncated = True
+    continuation_token = None
+    while is_truncated:
+        # make request
+        if continuation_token:
+            response = s3.list_objects_v2(Bucket="sliderule-public", Prefix="", ContinuationToken=continuation_token)
+        else:
+            response = s3.list_objects_v2(Bucket="sliderule-public", Prefix="")
+        # display status
+        sys.stdout.write("#")
+        sys.stdout.flush()
+        # parse contents
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                resource = obj['Key'].split("/")[-1]
+                if resource.endswith(".kd.v4.parquet"):
+                    data_files[resource] = obj['Size']
+        # check if more data is available
+        is_truncated = response['IsTruncated']
+        continuation_token = response.get('NextContinuationToken')
+    print(f"\nWriting {len(data_files)} files names to {args.outputs}")
+    with open(args.outputs, "w") as file:
+        for data_file in data_files:
+            file.write(f"{data_file}\n")
