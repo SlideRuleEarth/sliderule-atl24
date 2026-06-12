@@ -1,8 +1,15 @@
-import sys
+import importlib
 import boto3
 import json
 import argparse
 from sliderule import sliderule
+
+try:
+    tqdm = importlib.import_module("tqdm").tqdm
+except Exception:
+    # Fallback keeps script behavior unchanged when tqdm is unavailable.
+    def tqdm(iterable, **kwargs):
+        return iterable
 
 #########################################
 # command line arguments
@@ -144,7 +151,7 @@ if args.cycle:
         print(f"Submitted job {name} using script {args.script} with {len(args_list)} entries")
 
         # save job
-        database["submissions"][name] = rsps | {"completed": False}
+        database["submissions"][name] = rsps | {"complete": False}
         print(f"Saved job submission", rsps)
 
         # save granules
@@ -163,10 +170,10 @@ if args.status:
             status = session.runner.queue(name=name, job_id=job["job_id"])["report"]
             database["submissions"][name]["status"] = status
             if sum([status[s] for s in ["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING"]]) == 0:
-                database["submissions"]["name"]["complete"] = True
                 results = get_results(job["run_url"])
-                for granule, result in results.items():
+                for granule, result in tqdm(results.items(), total=len(results), desc=f"{name} results", unit="granule"):
                     database["granules"][granule] |= result
+                database["submissions"][name]["complete"] = True
 
     # display status
     columns = ["SUCCEEDED", "FAILED", "RUNNING", "STARTING", "RUNNABLE", "PENDING", "SUBMITTED"]
