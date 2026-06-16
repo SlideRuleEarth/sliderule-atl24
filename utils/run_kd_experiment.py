@@ -7,7 +7,7 @@ from sliderule import sliderule
 try:
     tqdm = importlib.import_module("tqdm").tqdm
 except Exception:
-    # Fallback keeps script behavior unchanged when tqdm is unavailable.
+    print(f"tqdm unavailable, progress of operations will not be reported")
     def tqdm(iterable, **kwargs):
         return iterable
 
@@ -116,9 +116,9 @@ def get_results(run_url):
         return json.loads(contents)
     bucket = run_url.split("s3://")[-1].split("/")[0]
     prefix = "/".join(run_url.split("s3://")[-1].split("/")[1:])
-    results = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
-    args_list = load_remote_file(bucket, results["args"])
-    for i in range(len(args_list)):
+    rsps = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
+    args_list = load_remote_file(bucket, rsps["args"])
+    for i in tqdm(range(len(args_list)), total=len(args_list), desc=f"{run_url}", unit="granule"):
         granule,_ = args_list[i].split(",")
         try:
             result = {}
@@ -129,9 +129,9 @@ def get_results(run_url):
                 result["status"] = "output"
                 result["output"] = rsps["output"]
                 result["duration"] = rsps["stop"] - rsps["start"]
-            results[granule] = result
         except Exception as e:
-            results[granule] = {"status": "error"}
+            result = {"status": "error"}
+        results[granule] = result
     return results
 
 #########################################
@@ -157,7 +157,7 @@ if args.cycle:
         # save granules
         for granules in args_list:
             atl03_granule, atl09_granule = granules.split(",")
-            database["granules"] = {"name": name, "status": "pending"}
+            database["granules"][atl03_granule] = {"name": name, "status": "pending"}
 
 #########################################
 # status jobs
@@ -166,13 +166,18 @@ if args.status:
 
     # get status
     for name,job in database["submissions"].items():
+        print(f"Statusing {name} - {job['complete'] and 'complete' or 'checking'}")
         if not job["complete"]:
             status = session.runner.queue(name=name, job_id=job["job_id"])["report"]
             database["submissions"][name]["status"] = status
             if sum([status[s] for s in ["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING"]]) == 0:
+                print(f"Job {name} complete, reading results...")
                 results = get_results(job["run_url"])
                 for granule, result in tqdm(results.items(), total=len(results), desc=f"{name} results", unit="granule"):
-                    database["granules"][granule] |= result
+                    if type(result) is dict:
+                        database["granules"][granule] |= result
+                    else:
+                        print(f"Result for {granule}: {result}")
                 database["submissions"][name]["complete"] = True
 
     # display status
