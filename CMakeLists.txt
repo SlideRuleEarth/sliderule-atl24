@@ -54,10 +54,10 @@ endif()
 # Source Files #
 target_sources(atl24
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/package/atl24.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/atl24_plugin.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Runner.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/package/KdExperiment.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/PluginFields.cpp
 )
 
@@ -82,11 +82,4 @@ install (
         ${ATL24DIR}/models/atl24.tgz
     DESTINATION
         ${CONFDIR}
-)
-install (
-    FILES
-        ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24g2.lua
-        ${CMAKE_CURRENT_LIST_DIR}/endpoints/atl24kd.lua
-    DESTINATION
-        ${CONFDIR}/api
 )
