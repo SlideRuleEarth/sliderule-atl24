@@ -58,7 +58,7 @@ repeat
     local atmo              = icesat2.atmo(parms, atl09h5)
     local kd490             = bathy_utils.get_viirs(parms, rgps)
     local kd_experiment     = atl24.kd_experiment(parms, kd490)
-    local sender            = core.framesender("rspq", 0, timeout)
+    local sender            = core.framesender(parms, "rspq")
     local dataframe         = core.dataframe({}, {granule=resource, request=json.encode(rqst)})
     local dataframes        = {} -- holds beam dataframes
 

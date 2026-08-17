@@ -198,7 +198,10 @@ if args.report:
         "error": 0
     }
     for granule,data in database["granules"].items():
-        stats[data["status"]] += 1
+        try:
+            stats[data["status"]] += 1
+        except Exception as e:
+            print(f"Unable to count {granule} with {data}: {e}")
     print(json.dumps(stats, indent=2))
 
 #########################################

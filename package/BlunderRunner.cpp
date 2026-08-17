@@ -146,7 +146,7 @@ bool BlunderRunner::run (GeoDataFrame* dataframe)
 
     // add metadata to dataframe
     FieldElement<int64_t>* relabeled = new FieldElement<int64_t>(q.size());
-    if(!df.addMetaData("relabeled", relabeled, "boolean on whether photon was relabeled as part of the cleanup", true))
+    if(!df.addMetaData("relabeled", relabeled, StringLib::duplicate("boolean on whether photon was relabeled as part of the cleanup"), true))
     {
         mlog(CRITICAL, "Failed to add metadata to dataframe");
         delete relabeled;
