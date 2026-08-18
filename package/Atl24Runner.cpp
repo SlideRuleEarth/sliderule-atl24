@@ -38,6 +38,8 @@
 
 #include "atl24.h"
 #include "ensemble.h"
+#include "estimate_kd.h"
+#include "estimate_surface_roughness.h"
 #include "xgboost.h"
 #include "photon.h"
 
@@ -109,13 +111,19 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
 {
     bool status = true;
     ATL24::ensemble::Params ensemble_params;
+    ATL24::estimate_kd::Params estimate_kd_params;
+    ATL24::estimate_surface_roughness::Params estimate_surface_roughness_params;
     FString model_filename("%s/atl24.tgz", CONFDIR);
 
     // cast dataframe to ATL24 specific dataframe
     BathyDataFrame& df = *dynamic_cast<BathyDataFrame*>(dataframe);
+    size_t num_rows = static_cast<size_t>(df.length());
 
     // create new columns
     FieldColumn<int>* class_ph = new FieldColumn<int>;
+    FieldColumn<float>* confidence = new FieldColumn<float>;
+    FieldColumn<float>* kd = new FieldColumn<float>;
+    FieldColumn<float>* surface_roughness = new FieldColumn<float>;
 
     // determine serialization
     const bool serialize = df.length() > serializeThreshold;
@@ -127,7 +135,6 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         vector<ATL24::photon::Photon> p(df.length());
         for(size_t i = 0; i < static_cast<size_t>(df.length()); ++i)
         {
-            // only the below members of the structure are used
             p[i].gps_seconds    = TimeLib::sysex2gpstime(df.time_ns[i]);
             p[i].lat_ph         = df.lat_ph[i];
             p[i].lon_ph         = df.lon_ph[i];
@@ -138,14 +145,32 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
             p[i].spot           = df.spot.value;
         }
 
-        // execute classifier
+        // ENTER conditional serialized execution
         if(serialize) experiment.lock();
-        const ATL24::xgboost::ClassificationResult results = ATL24::main_pipeline::classify (p, model_filename.c_str(), true, ensemble_params);
+
+        // classify photons
+        const ATL24::xgboost::ClassificationResult classification = ATL24::main_pipeline::classify (p, model_filename.c_str(), true, ensemble_params);
+        if(classification.labels.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned labels: %lu != %lu", classification.labels.size(), num_rows);
+        for(size_t i; i < classification.labels.size(); i++) p[i].class_ph = classification.labels[i]; // class_ph needs to be populated for kd and surface roughness algorithms
+
+        // estimate kd
+        const vector<double> kd_estimates = ATL24::estimate_kd::classify (p, estimate_kd_params);
+        if(kd_estimates.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned kd estimates: %lu != %lu", kd_estimates.size(), num_rows);
+
+        // estimate surface roughness
+        const vector<double> estimated_surface_roughness = ATL24::estimate_surface_roughness::classify (p, estimate_surface_roughness_params);
+        if(estimated_surface_roughness.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned estimated surface roughness: %lu != %lu", estimated_surface_roughness.size(), num_rows);
+
+        // EXIT conditional serialized execution
         if(serialize) experiment.unlock();
-        for(const int& label: results.labels)
+
+        // update new dataframe columns
+        for(size_t i; i < num_rows; i++)
         {
-            // add class_ph
-            class_ph->append(label);
+            class_ph->append(classification.labels[i]);
+            confidence->append(classification.probabilities[i][ATL24::labeling::label_map.at(static_cast<int>(ATL24::photon::Label::bathy))]);
+            kd->append(static_cast<float>(kd_estimates[i]));
+            surface_roughness->append(static_cast<float>(estimated_surface_roughness[i]));
         }
     }
     catch(const std::exception& e)
@@ -154,9 +179,11 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         mlog(CRITICAL, "Failed to run classifier on %s spot %d: %s", df.granule.value.c_str(), df.spot.value, e.what());
     }
 
-
     // add columns to dataframe
-    df.addExistingColumn("class_ph", class_ph, "photon classification");
+    df.addExistingColumn("class_ph",            class_ph,           "photon classification");
+    df.addExistingColumn("confidence",          confidence,         "bathymetry classification probability");
+    df.addExistingColumn("kd",                  kd,                 "turbidity");
+    df.addExistingColumn("surface_roughness",   surface_roughness,  "surface roughness");
 
     // return success
     return status;

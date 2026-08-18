@@ -30,11 +30,11 @@
  */
 
 /******************************************************************************
- *INCLUDES
+ * INCLUDES
  ******************************************************************************/
 
 #include "LuaEngine.h"
-#include "Icesat2Parameters.h"
+#include "Atl03Granule.h"
 
 #include "Atl24Runner.h"
 #include "Atl24Writer.h"
@@ -86,8 +86,9 @@ int atl24_open (lua_State *L)
     static const struct luaL_Reg atl24_functions[] = {
         {"version",         atl24_version},
         {"blunder",         BlunderRunner::luaCreate},
-        {"atl24",           Atl24Runner::luaCreate},
-        {"hdf5file",        Atl24Writer::luaCreate},
+        {"classifier",      Atl24Runner::luaCreate},
+        {"writer",          Atl24Writer::luaCreate},
+        {"atl03granule",    Atl03Granule::luaCreate},
         {NULL,              NULL}
     };
 

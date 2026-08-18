@@ -16,8 +16,8 @@ repeat
     end
 
     -- status arguments
-    local resource, resource09 = Arguments:match("([^,]+),([^,]+)")
-    if not resource or not resource09 then
+    local resource = Arguments:match("([^,]+)")
+    if not resource then
         table.insert(result["messages"], "failed to get arguments")
         result["status"] = false
         break
@@ -25,16 +25,16 @@ repeat
         table.insert(result["messages"], string.format("processing resource=%s, timeout=%d ms", resource, timeout))
     end
 
+    -- output files
+    local parquet_output_file = resource:gsub("ATL03", "atl24r3/parquet/ATL24"):gsub(".h5", "003_01.parquet")
+    local h5_output_file = resource:gsub("ATL03", "atl24r3/h5/ATL24"):gsub(".h5", "003_01.h5")
+
     -- request structure
     local rqst = {
-        ["atl09_fields"] = {
-            "low_rate/met_v10m",
-            "low_rate/met_u10m"
-        },
         ["output"] = {
             ["asset"] = "sliderule-stage",
             ["format"] = "geoparquet",
-            ["path"] = string.format("%s.kd.v4.parquet", resource),
+            ["path"] = parquet_output_file,
             ["with_checksum"] = true
         }
     }
@@ -48,16 +48,11 @@ repeat
 
     -- create objects used in processing granule
     local parms             = bathy.parms(rqst, nil, "icesat2", resource)
-    local granule           = parms["granule"]
-    local rdate             = string.format("%04d-%02d-%02dT00:00:00Z", granule["year"], granule["month"], granule["day"])
-    local rgps              = time.gmt2gps(rdate)
     local bathymask         = bathy.mask()
     local atl03h5           = h5coro.object(parms["asset"], resource)
+    local granule           = icesat2.atl03granule(parms, atl03h5, _rqst.rspq)
     local consoleq          = msg.subscribe("consoleq") -- prevents error posting to consoleq
-    local atl09h5           = h5coro.object("icesat2-atl09", resource09)
-    local atmo              = icesat2.atmo(parms, atl09h5)
-    local kd490             = bathy_utils.get_viirs(parms, rgps)
-    local kd_experiment     = atl24.kd_experiment(parms, kd490)
+    local classifier        = atl24.classifier(parms)
     local sender            = core.framesender(parms, "rspq")
     local dataframe         = core.dataframe({}, {granule=resource, request=json.encode(rqst)})
     local dataframes        = {} -- holds beam dataframes
@@ -67,8 +62,7 @@ repeat
     for _, beam in ipairs(parms["beams"]) do
         local df = bathy.dataframe(beam, parms, bathymask, atl03h5, "consoleq")
         if df then
-            df:run(atmo)
-            df:run(kd_experiment)
+            df:run(classifier)
             df:run(sender)
             df:run(core.TERMINATE)
             dataframes[beam] = df
@@ -118,19 +112,37 @@ repeat
     -- write dataFrame to parquet file
     local arrow_filename = arrow_dataframe:export()
     if not arrow_filename then
-        table.insert(result["messages"], "failed to write dataframe")
+        table.insert(result["messages"], "failed to write dataframe to parquet file")
         result["status"] = false
         break
     end
 
-    -- send file to s3
-    result["output"] = parms["output"]["path"]
-    local status = core.send2user(arrow_filename, "consoleq", parms)
-    if not status then
-        table.insert(result["messages"], "failed to send dataframe")
+    -- send parquet file to s3
+    local parquet_status = core.send2user(arrow_filename, "consoleq", parms, parquet_output_file)
+    if not parquet_status then
+        table.insert(result["messages"], "failed to send parquet file")
         result["status"] = false
         break
     end
+
+    -- write dataframes to h5 file
+    local tmp_filename = string.format("/tmp/%s.%s", h5_output_file, _rqst.id)
+    local atl24_file = atl24.hdf5file(parms, dataframes, granule)
+    local write_status = atl24_file:write(tmp_filename)
+    if not write_status then
+        table.insert(result["messages"], "failed to write h5 file")
+        result["status"] = false
+        break
+    end
+
+    -- send h5 file to s3
+    local h5_status = core.send2user(tmp_filename, _rqst.rspq, parms, h5_output_file)
+    if not h5_status then
+        table.insert(result["messages"], "failed to send h5 file")
+        result["status"] = false
+        break
+    end
+
 until true
 
 -- return results

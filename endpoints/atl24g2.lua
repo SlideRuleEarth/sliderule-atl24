@@ -73,7 +73,7 @@ local function main()
     atl24_file:write(tmp_filename)
 
     -- send new atl24 releas 02 granule to user
-    core.send2user(tmp_filename, parms, _rqst.rspq)
+    core.send2user(tmp_filename, _rqst.rspq, parms)
 end
 
 -------------------------------------------------------
