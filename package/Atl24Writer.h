@@ -42,8 +42,8 @@
 #include "HdfLib.h"
 #include "FieldElement.h"
 #include "Icesat2Parameters.h"
-#include "Atl24DataFrame.h"
-#include "Atl24Granule.h"
+#include "BathyDataFrame.h"
+#include "Atl03Granule.h"
 
 /******************************************************************************
  * CLASS DECLARATION
@@ -84,7 +84,7 @@ class Atl24Writer: public LuaObject
          * Methods
          *--------------------------------------------------------------------*/
 
-        Atl24Writer  (lua_State* L, Icesat2Parameters* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule);
+        Atl24Writer  (lua_State* L, Icesat2Parameters* _parms, BathyDataFrame** _dataframes, Atl03Granule* _granule);
         ~Atl24Writer (void) override;
 
         static int luaWriteFile (lua_State* L);
@@ -96,8 +96,8 @@ class Atl24Writer: public LuaObject
         FieldElement<string> release; // standard data product release number
 
         Icesat2Parameters* parms;
-        Atl24DataFrame* dataframes[NUM_BEAMS];
-        Atl24Granule* granule;
+        BathyDataFrame* dataframes[NUM_BEAMS];
+        Atl03Granule* granule;
 };
 
 #endif  /* __atl24_writer__ */

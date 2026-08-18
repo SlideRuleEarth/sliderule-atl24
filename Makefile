@@ -12,7 +12,6 @@ PROJECT_FOLDER = cf
 AWS_REGION = us-west-2
 MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
-CMD ?= /usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/kd_experiment.lua ATL03_20241107234251_08052501_007_01.h5,ATL09_20241107234251_08052501_007_01.h5 /tmp
 
 all:
 	make -j8 -C $(BUILD)
@@ -48,20 +47,7 @@ tag:
 
 release: distclean tag config-stage-release all publish
 
-atl24d-docker:
-	-rm -Rf $(STAGE)
-	mkdir -p $(STAGE)
-	cd docker && conda-lock -p linux-$(shell arch) -f environment.yml
-	cd docker && conda-lock render -p linux-$(shell arch)
-	cp docker/Dockerfile $(STAGE)
-	cp docker/conda-* $(STAGE)
-	cp docker/runner.* $(STAGE)
-	cd $(STAGE) && docker build -t $(CONTAINER_REGISTRY)/atl24d:$(VERSION) .
-
-atl24d-push:
-	docker push $(CONTAINER_REGISTRY)/atl24d:$(VERSION)
-
-atl24-docker:
+docker-runner:
 	-rm -Rf $(STAGE)
 	mkdir -p $(STAGE)
 	rsync -a $(ROOT) $(STAGE) --exclude build --exclude stage --exclude data
@@ -71,7 +57,7 @@ atl24-docker:
 	cp docker/atl24/docker-entrypoint.sh $(STAGE)
 	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:runner .
 
-atl24-run:
+test-docker-run:
 	docker run \
 		--network host \
 		-v /data:/data \
@@ -89,7 +75,10 @@ atl24-run:
 		-e CONTAINER_REGISTRY=$(CONTAINER_REGISTRY) \
 		--name atl24 --rm \
 		$(CONTAINER_REGISTRY)/sliderule:runner \
-		$(CMD)
+		/usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/gen_atl24r3.lua ATL03_20181027185143_04450108_006_02.h5 /tmp
+
+test-atl24-run:
+	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/utils/gen_atl24r3.lua ATL03_20181028071900_04530107_006_02.h5 /tmp"
 
 clean:
 	- make -C $(BUILD) clean

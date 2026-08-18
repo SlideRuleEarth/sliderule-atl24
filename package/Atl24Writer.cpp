@@ -43,7 +43,7 @@
 #include "GeoDataFrame.h"
 #include "FieldColumn.h"
 #include "TimeLib.h"
-#include "Atl24DataFrame.h"
+#include "BathyDataFrame.h"
 #include "Icesat2Parameters.h"
 
 /******************************************************************************
@@ -57,7 +57,7 @@ const struct luaL_Reg Atl24Writer::LUA_META_TABLE[] = {
     {NULL,          NULL}
 };
 
-const char* Atl24Writer::RELEASE = "02";
+const char* Atl24Writer::RELEASE = "03";
 
 const char* Atl24Writer::BEAMS[NUM_BEAMS] = {"gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"};
 
@@ -147,8 +147,8 @@ void Atl24Writer::init (void)
 int Atl24Writer::luaCreate (lua_State* L)
 {
     Icesat2Parameters* _parms = NULL;
-    Atl24DataFrame* _dataframes[NUM_BEAMS] = {NULL, NULL, NULL, NULL, NULL, NULL};
-    Atl24Granule* _granule = NULL;
+    BathyDataFrame* _dataframes[NUM_BEAMS] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    Atl03Granule* _granule = NULL;
 
     try
     {
@@ -167,14 +167,14 @@ int Atl24Writer::luaCreate (lua_State* L)
                 lua_getfield(L, dataframe_table_index, BEAMS[i]);
                 if(!lua_isnil(L, -1))
                 {
-                    _dataframes[i] = dynamic_cast<Atl24DataFrame*>(getLuaObject(L, -1, GeoDataFrame::OBJECT_TYPE));
+                    _dataframes[i] = dynamic_cast<BathyDataFrame*>(getLuaObject(L, -1, GeoDataFrame::OBJECT_TYPE));
                 }
                 lua_pop(L, 1);
             }
         }
 
         /* Get Granule */
-        _granule = dynamic_cast<Atl24Granule*>(getLuaObject(L, granule_index, Atl24Granule::OBJECT_TYPE));
+        _granule = dynamic_cast<Atl03Granule*>(getLuaObject(L, granule_index, Atl03Granule::OBJECT_TYPE));
 
         /* Return Dispatch Object */
         return createLuaObject(L, new Atl24Writer(L, _parms, _dataframes, _granule));
@@ -195,7 +195,7 @@ int Atl24Writer::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-Atl24Writer::Atl24Writer(lua_State* L, Icesat2Parameters* _parms, Atl24DataFrame** _dataframes, Atl24Granule* _granule):
+Atl24Writer::Atl24Writer(lua_State* L, Icesat2Parameters* _parms, BathyDataFrame** _dataframes, Atl03Granule* _granule):
     LuaObject(L, OBJECT_TYPE, LUA_META_NAME, LUA_META_TABLE),
     release(RELEASE),
     parms(_parms),
@@ -244,31 +244,34 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         /* Get Self */
         Atl24Writer* lua_obj = dynamic_cast<Atl24Writer*>(getLuaSelf(L, 1));
         Icesat2Parameters* parms = lua_obj->parms;
-        Atl24Granule& granule = *lua_obj->granule;
+        Atl03Granule& granule = *lua_obj->granule;
 
         /* Get Filename */
         const char* filename = getLuaString(L, 2);
 
-        /* Get Plugin Metadata */
+        /* Get Metadata */
         PluginFields pluginFields;
         FieldElement<string> atl24_metadata(pluginFields.toJson());
+        FieldElement<string> rqst_metadata(parms->toJson());
+
 
         /**********************/
         /* Create Beam Groups */
         /**********************/
-        Atl24DataFrame* last_df = NULL;
+        BathyDataFrame* last_df = NULL;
         for(int i = 0; i < NUM_BEAMS; i++)
         {
             /* Get and Check DataFrame for Beam */
-            Atl24DataFrame* df = lua_obj->dataframes[i];
-            if(!df || df->class_ph.length() <= 0) continue;
+            BathyDataFrame* df = lua_obj->dataframes[i];
+            if(!df || df->time_ns.length() <= 0) continue;
             last_df = df;
 
             /* Create Beam Group */
             add_group(datasets, BEAMS[i]);
 
             /* Create Variable - class_ph */
-            add_variable(datasets, "class_ph", &df->class_ph);
+            FieldColumn<int8_t>* class_ph = reinterpret_cast<FieldColumn<int8_t>*>(df->getColumn("class_ph"));
+            add_variable(datasets, "class_ph", class_ph);
             add_attribute(datasets, "contentType", "modelResults");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "0 - unclassified, 1 - other, 40 - bathymetry, 41 - sea surface");
@@ -278,7 +281,8 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             goto_parent(datasets);
 
             /* Create Variable - confidence */
-            add_variable(datasets, "confidence", &df->confidence);
+            FieldColumn<float>* confidence = reinterpret_cast<FieldColumn<float>*>(df->getColumn("confidence"));
+            add_variable(datasets, "confidence", confidence);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "ensemble confidence score from 0.0 to 1.0 where larger numbers represent higher confidence in classification");
@@ -315,8 +319,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             goto_parent(datasets);
 
             /* Create Variable - index_ph */
-            FieldColumn<int32_t>* index_ph = dynamic_cast<FieldColumn<int32_t>*>(df->getColumn("index_ph"));
-            add_variable(datasets, "index_ph", index_ph);
+            add_variable(datasets, "index_ph", &df->index_ph);
             add_attribute(datasets, "contentType", "physicalMeasurement");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "0-based index of the photon in the ATL03 heights group");
@@ -326,8 +329,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             goto_parent(datasets);
 
             /* Create Variable - index_seg */
-            FieldColumn<int32_t>* index_seg = dynamic_cast<FieldColumn<int32_t>*>(df->getColumn("index_seg"));
-            add_variable(datasets, "index_seg", index_seg);
+            add_variable(datasets, "index_seg", &df->index_seg);
             add_attribute(datasets, "contentType", "physicalMeasurement");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "0-based index of the photon in the ATL03 geolocation group");
@@ -336,28 +338,14 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "units", "scalar");
             goto_parent(datasets);
 
-            /* Create Variable - invalid_kd */
-            add_variable(datasets, "invalid_kd", &df->invalid_kd);
-            add_attribute(datasets, "contentType", "modelResult");
+            /* Create Variable - index_seg */
+            add_variable(datasets, "segment_id", &df->segment_id);
+            add_attribute(datasets, "contentType", "physicalMeasurement");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "Indicates that no data was available in the VIIRS Kd490 8-day cycle dataset at the time and location of the photon");
-            add_attribute(datasets, "long_name", "Invalid Kd");
-            add_attribute(datasets, "source", "VIIRS Kd490");
-            add_attribute(datasets, "units", "boolean");
-            add_attribute(datasets, "flag_meanings", "false, true");
-            add_attribute(datasets, "flag_values", "0, 1");
-            goto_parent(datasets);
-
-            /* Create Variable - invalid_wind_speed */
-            add_variable(datasets, "invalid_wind_speed", &df->invalid_wind_speed);
-            add_attribute(datasets, "contentType", "modelResult");
-            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "Indicates that ATL09 data was not able to be read to determine wind speed");
-            add_attribute(datasets, "long_name", "Invalid wind speed");
-            add_attribute(datasets, "source", "ATL09");
-            add_attribute(datasets, "units", "boolean");
-            add_attribute(datasets, "flag_meanings", "false, true");
-            add_attribute(datasets, "flag_values", "0, 1");
+            add_attribute(datasets, "description", "ATL03 segment id of the photon");
+            add_attribute(datasets, "long_name", "Segment ID");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "scalar");
             goto_parent(datasets);
 
             /* Create Variable - lat_ph */
@@ -386,20 +374,13 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute_double(datasets, "valid_min", -180.0);
             goto_parent(datasets);
 
-            /* Create Variable - low_confidence_flag */
-            add_variable(datasets, "low_confidence_flag", &df->low_confidence_flag);
-            add_attribute(datasets, "contentType", "modelResult");
-            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "There is low confidence that the photon classified as bathymetry is actually bathymetry");
-            add_attribute(datasets, "long_name", "Low confidence bathymetry flag");
-            add_attribute(datasets, "source", "ATL03");
-            add_attribute(datasets, "units", "boolean");
-            add_attribute(datasets, "flag_meanings", "false, true");
-            add_attribute(datasets, "flag_values", "0, 1");
-            goto_parent(datasets);
-
             /* Create Variable - night_flag */
-            add_variable(datasets, "night_flag", &df->night_flag);
+            FieldColumn<int8_t> night_flag;
+            for(long i = 0; i < df->processing_flags.length(); i++)
+            {
+                night_flag.append(static_cast<int8_t>((df->processing_flags[i] & BathyParameters::NIGHT_FLAG) != 0));
+            }
+            add_variable(datasets, "night_flag", &night_flag);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "The solar elevation was less than 5 degrees at the time and location of the photon");
@@ -411,7 +392,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             goto_parent(datasets);
 
             /* Create Variable - ortho_h */
-            add_variable(datasets, "ortho_h", &df->ortho_h);
+            add_variable(datasets, "ortho_h", &df->geoid_corr_h);
             add_attribute(datasets, "contentType", "physicalMeasurement");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "Height of each received photon, relative to the geoid.");
@@ -420,40 +401,29 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "units", "meters");
             goto_parent(datasets);
 
-            /* Create Variable - sensor_depth_exceeded */
-            add_variable(datasets, "sensor_depth_exceeded", &df->sensor_depth_exceeded);
-            add_attribute(datasets, "contentType", "modelResult");
-            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "The subaqueous photon is below the maximum depth detectable by the ATLAS sensor given the Kd of the water column");
-            add_attribute(datasets, "long_name", "Sensor depth exceeded");
-            add_attribute(datasets, "source", "ATL03");
-            add_attribute(datasets, "units", "boolean");
-            add_attribute(datasets, "flag_meanings", "false, true");
-            add_attribute(datasets, "flag_values", "0, 1");
-            goto_parent(datasets);
-
-            /* Create Variable - sigma_thu */
-            add_variable(datasets, "sigma_thu", &df->sigma_thu);
-            add_attribute(datasets, "contentType", "physicalMeasurement");
-            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "The combination of the aerial and subaqueous horizontal uncertainty for each received photon");
-            add_attribute(datasets, "long_name", "Total horizontal uncertainty");
-            add_attribute(datasets, "source", "ATL03");
-            add_attribute(datasets, "units", "meters");
-            goto_parent(datasets);
-
-            /* Create Variable - sigma_tvu */
-            add_variable(datasets, "sigma_tvu", &df->sigma_tvu);
-            add_attribute(datasets, "contentType", "modelResult");
-            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "The combination of the aerial and subaqueous vertical uncertainty for each received photon");
-            add_attribute(datasets, "long_name", "Total vertical uncertainty");
-            add_attribute(datasets, "source", "ATL03");
-            add_attribute(datasets, "units", "meters");
-            goto_parent(datasets);
-
+//            /* Create Variable - sigma_thu */
+//            add_variable(datasets, "sigma_thu", &df->sigma_thu);
+//            add_attribute(datasets, "contentType", "physicalMeasurement");
+//            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+//            add_attribute(datasets, "description", "The combination of the aerial and subaqueous horizontal uncertainty for each received photon");
+//            add_attribute(datasets, "long_name", "Total horizontal uncertainty");
+//            add_attribute(datasets, "source", "ATL03");
+//            add_attribute(datasets, "units", "meters");
+//            goto_parent(datasets);
+//
+//            /* Create Variable - sigma_tvu */
+//            add_variable(datasets, "sigma_tvu", &df->sigma_tvu);
+//            add_attribute(datasets, "contentType", "modelResult");
+//            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+//            add_attribute(datasets, "description", "The combination of the aerial and subaqueous vertical uncertainty for each received photon");
+//            add_attribute(datasets, "long_name", "Total vertical uncertainty");
+//            add_attribute(datasets, "source", "ATL03");
+//            add_attribute(datasets, "units", "meters");
+//            goto_parent(datasets);
+//
             /* Create Variable - surface_h */
-            add_variable(datasets, "surface_h", &df->surface_h);
+            FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(df->getColumn("surface_h"));
+            add_variable(datasets, "surface_h", surface_h);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "The geoid corrected height of the sea surface at the detected photon");
@@ -822,7 +792,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_group(datasets, "metadata");
 
         /* Create Variable - sliderule */
-        add_scalar(datasets, "sliderule", &granule["sliderule"]);
+        add_scalar(datasets, "sliderule", &rqst_metadata);
         add_attribute(datasets, "contentType", "auxiliaryInformation");
         add_attribute(datasets, "description", "sliderule server and request information");
         add_attribute(datasets, "long_name", "SlideRule MetaData");
@@ -835,15 +805,6 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "contentType", "auxiliaryInformation");
         add_attribute(datasets, "description", "atl24 algorithm versioning and build information");
         add_attribute(datasets, "long_name", "ATL24 MetaData");
-        add_attribute(datasets, "source", "Derived");
-        add_attribute(datasets, "units", "json");
-        goto_parent(datasets);
-
-        /* Create Variable - extent */
-        add_scalar(datasets, "extent", &granule["extent"]);
-        add_attribute(datasets, "contentType", "auxiliaryInformation");
-        add_attribute(datasets, "description", "geospatial and temporal extents");
-        add_attribute(datasets, "long_name", "Query MetaData");
         add_attribute(datasets, "source", "Derived");
         add_attribute(datasets, "units", "json");
         goto_parent(datasets);

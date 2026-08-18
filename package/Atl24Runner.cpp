@@ -38,6 +38,7 @@
 
 #include "atl24.h"
 #include "ensemble.h"
+#include "elevations.h"
 #include "estimate_kd.h"
 #include "estimate_surface_roughness.h"
 #include "xgboost.h"
@@ -49,8 +50,6 @@
 #include "Icesat2Parameters.h"
 #include "BathyDataFrame.h"
 #include "Atl24Runner.h"
-
-using namespace ATL24::main_pipeline;
 
 /******************************************************************************
  * DATA
@@ -110,9 +109,10 @@ Atl24Runner::~Atl24Runner (void)
 bool Atl24Runner::run (GeoDataFrame* dataframe)
 {
     bool status = true;
-    ATL24::ensemble::Params ensemble_params;
-    ATL24::estimate_kd::Params estimate_kd_params;
-    ATL24::estimate_surface_roughness::Params estimate_surface_roughness_params;
+    const ATL24::ensemble::Params ensemble_params;
+    const ATL24::elevations::ElevationsParams elevations_params;
+    const ATL24::estimate_kd::Params estimate_kd_params;
+    const ATL24::estimate_surface_roughness::Params estimate_surface_roughness_params;
     FString model_filename("%s/atl24.tgz", CONFDIR);
 
     // cast dataframe to ATL24 specific dataframe
@@ -122,6 +122,7 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
     // create new columns
     FieldColumn<int>* class_ph = new FieldColumn<int>;
     FieldColumn<float>* confidence = new FieldColumn<float>;
+    FieldColumn<float>* surface_h = new FieldColumn<float>;
     FieldColumn<float>* kd = new FieldColumn<float>;
     FieldColumn<float>* surface_roughness = new FieldColumn<float>;
 
@@ -153,6 +154,10 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         if(classification.labels.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned labels: %lu != %lu", classification.labels.size(), num_rows);
         for(size_t i; i < classification.labels.size(); i++) p[i].class_ph = classification.labels[i]; // class_ph needs to be populated for kd and surface roughness algorithms
 
+        // generate sea surface elevation
+        const vector<ATL24::elevations::Elevations> elevations = get_elevations (p, elevations_params);
+        if(elevations.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned elevations: %lu != %lu", elevations.size(), num_rows);
+
         // estimate kd
         const vector<double> kd_estimates = ATL24::estimate_kd::classify (p, estimate_kd_params);
         if(kd_estimates.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned kd estimates: %lu != %lu", kd_estimates.size(), num_rows);
@@ -181,6 +186,7 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
 
     // add columns to dataframe
     df.addExistingColumn("class_ph",            class_ph,           "photon classification");
+    df.addExistingColumn("surface_h",           surface_h,          "surface elevation");
     df.addExistingColumn("confidence",          confidence,         "bathymetry classification probability");
     df.addExistingColumn("kd",                  kd,                 "turbidity");
     df.addExistingColumn("surface_roughness",   surface_roughness,  "surface roughness");
