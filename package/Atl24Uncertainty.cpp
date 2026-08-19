@@ -369,7 +369,6 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
 
             /* subaqueous horizontal uncertainty */
             subaqueous_horizontal_uncertainty = 0.577 * (thu.a + (thu.b * depth)); // [22]
-printf("UNCERTAINTY: %lf %lf %lf %d\n", transport_uncertainty, signal_uncertainty, subaqueous_horizontal_uncertainty, entry_index);
         }
 
         /* total uncertainties */
