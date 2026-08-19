@@ -103,9 +103,10 @@ class Atl24Uncertainty: public GeoDataFrame::FrameRunner
 
         static const char*          UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLES];
 
-        static vector<entry_t>      SNR[NUM_POINTING_ANGLES];
-        static vector<entry_t>      THU[NUM_POINTING_ANGLES];
-        static vector<entry_t>      TRANSPORT[NUM_POINTING_ANGLES];
+        static const int            NUM_TABLE_ENTRIES = 25;
+        static entry_t              SNR[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
+        static entry_t              THU[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
+        static entry_t              TRANSPORT[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
 
         BathyParameters*            parms;
 };

@@ -4,7 +4,8 @@ project (ATL24 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 23)
-#set(CMAKE_CXX_FLAGS "-Wall -Werror -Wshadow ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g")
+set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 
 # Squelch a warning when building on Win32/Cygwin
 set (CMAKE_LEGACY_CYGWIN_WIN32 0)

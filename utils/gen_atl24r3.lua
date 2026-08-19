@@ -37,6 +37,9 @@ repeat
             ["format"] = "geoparquet",
             ["path"] = parquet_output_file,
             ["with_checksum"] = true
+        },
+        ["beams"] = {
+            "gt1l"
         }
     }
 
@@ -131,7 +134,7 @@ repeat
 
     -- write dataframes to h5 file
     local tmp_filename = string.format("/tmp/%s", resource:gsub("ATL03", "TMP"):gsub("%.h5", ".bin"))
-    local atl24_file = atl24.writer(parms, dataframes, granule)
+    local atl24_file = atl24.writer(parms, dataframes, granule, release)
     local write_status = atl24_file:write(tmp_filename)
     if not write_status then
         table.insert(result["messages"], "failed to write h5 file")

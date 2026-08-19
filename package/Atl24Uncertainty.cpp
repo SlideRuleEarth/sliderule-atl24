@@ -70,7 +70,7 @@ const char* Atl24Uncertainty::UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLE
     "/data/Transport_ATLAS_5_deg.csv"}
 };
 
-// WIND_SPEED_LUT[wind_speed] --> index
+// WIND_SPEED_INDEX[wind_speed] --> index
 const int Atl24Uncertainty::WIND_SPEED_INDEX[NUM_WIND_SPEEDS] = {
     0, // 0
     0, // 1
@@ -97,9 +97,9 @@ const int Atl24Uncertainty::KD_INDEX[NUM_KDS] = {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4  // 4
 };
 
-vector<Atl24Uncertainty::entry_t> Atl24Uncertainty::SNR[NUM_POINTING_ANGLES];
-vector<Atl24Uncertainty::entry_t> Atl24Uncertainty::THU[NUM_POINTING_ANGLES];
-vector<Atl24Uncertainty::entry_t> Atl24Uncertainty::TRANSPORT[NUM_POINTING_ANGLES];
+Atl24Uncertainty::entry_t Atl24Uncertainty::SNR[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
+Atl24Uncertainty::entry_t Atl24Uncertainty::THU[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
+Atl24Uncertainty::entry_t Atl24Uncertainty::TRANSPORT[NUM_POINTING_ANGLES][NUM_TABLE_ENTRIES];
 
 /******************************************************************************
  * FUNCTIONS
@@ -174,7 +174,7 @@ void Atl24Uncertainty::init (void)
             {
                 char err_buf[256];
                 mlog(CRITICAL, "Failed to open file %s with error: %s", uncertainty_filename, strerror_r(errno, err_buf, sizeof(err_buf))); // Get thread-safe error message
-                return;
+                continue;
             }
 
             /* read header line */
@@ -183,31 +183,61 @@ void Atl24Uncertainty::init (void)
             {
                 mlog(CRITICAL, "Failed to read header from uncertainty file %s", uncertainty_filename);
                 fclose(file);
-                return;
+                continue;
             }
 
-            /* select destination table for this dimension and pointing angle */
-            vector<entry_t>* dimension_tables[NUM_DIMS] = {SNR, THU, TRANSPORT};
-            vector<entry_t>& tu = dimension_tables[dim][pointing_angle_index];
-            tu.clear();
-
             /* read all rows */
-            entry_t entry;
             if(dim == SNR_DIM)
             {
                 /* SNR provides three coefficients: a, b, and c */
+                entry_t entry;
+                int row = 0;
                 while(fscanf(file, "%d,%15[^,],%lf,%lf,%lf\n", &entry.Wind, entry.JerlovType, &entry.a, &entry.b, &entry.c) == 5)
                 {
-                    tu.push_back(entry);
+                    if(row < NUM_TABLE_ENTRIES)
+                    {
+                        SNR[pointing_angle_index][row++] = entry;
+                    }
+                    else
+                    {
+                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[SNR_DIM][pointing_angle_index]);
+                    }
                 }
             }
-            else
+            else if(dim == THU_DIM)
             {
-                /* THU and Transport provide only a and b; leave c unpopulated */
+                /* THU provides two coefficients: a and b*/
+                entry_t entry;
                 entry.c = 0.0;
+                int row = 0;
                 while(fscanf(file, "%d,%15[^,],%lf,%lf\n", &entry.Wind, entry.JerlovType, &entry.a, &entry.b) == 4)
                 {
-                    tu.push_back(entry);
+                    if(row < NUM_TABLE_ENTRIES)
+                    {
+                        THU[pointing_angle_index][row++] = entry;
+                    }
+                    else
+                    {
+                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[THU_DIM][pointing_angle_index]);
+                    }
+                }
+            }
+            else if(dim == TRANSPORT_DIM)
+            {
+                /* Transport provides two coefficients: a and b*/
+                entry_t entry;
+                entry.c = 0.0;
+                int row = 0;
+                while(fscanf(file, "%d,%15[^,],%lf,%lf\n", &entry.Wind, entry.JerlovType, &entry.a, &entry.b) == 4)
+                {
+                    if(row < NUM_TABLE_ENTRIES)
+                    {
+                        TRANSPORT[pointing_angle_index][row++] = entry;
+                    }
+                    else
+                    {
+                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[TRANSPORT_DIM][pointing_angle_index]);
+                    }
                 }
             }
 
@@ -245,9 +275,26 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
     FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(df.getColumn("surface_h", true));
     FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(df.getColumn("kd", true));
     FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(df.getColumn("surface_roughness", true));
+
+    /* check input columns */
     if(!surface_h || !kd || !surface_roughness)
     {
         mlog(CRITICAL, "unable to find uncertainty input columns");
+        return false;
+    }
+    else if(surface_h->length() != df.length())
+    {
+        mlog(CRITICAL, "invalid surface_h column length: %ld", surface_h->length());
+        return false;
+    }
+    else if(kd->length() != df.length())
+    {
+        mlog(CRITICAL, "invalid kd column length: %ld", kd->length());
+        return false;
+    }
+    else if(surface_roughness->length() != df.length())
+    {
+        mlog(CRITICAL, "invalid surface_roughness column length: %ld", surface_roughness->length());
         return false;
     }
 
@@ -258,11 +305,18 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
     /* for each photon in extent */
     for(long i = 0; i < df.length(); i++)
     {
+        /* get pointing angle index */
+        const int pointing_angle_index = discretize(elrad2deg(df.ref_el[i]), 1, NUM_POINTING_ANGLES + 1) - 1;
+
         /* get lookup table entry index */
-        const int pointing_angle_index = discretize(elrad2deg(df.ref_el[i]), 0, NUM_POINTING_ANGLES);
-        const int wind_speed_index = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS);
-        const int kd_index = discretize((*kd)[i], 0, NUM_KDS, D_CEILING);
-        const int entry_index = wind_speed_index * 5 + kd_index;
+        const int wind_speed_lookup = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS);
+        const int kd_lookup = discretize((*kd)[i] * 100.0, 0, NUM_KDS, D_CEILING);
+        int entry_index = (WIND_SPEED_INDEX[wind_speed_lookup] * 5) + KD_INDEX[kd_lookup];
+        if(entry_index < 0 || entry_index >= NUM_TABLE_ENTRIES)
+        {
+            mlog(CRITICAL, "Invalid uncertainty table entry detected on row %ld: %d", i, entry_index);
+            entry_index = NUM_TABLE_ENTRIES - 1;
+        }
 
         /* get coefficients */
         const entry_t& snr = SNR[pointing_angle_index][entry_index];

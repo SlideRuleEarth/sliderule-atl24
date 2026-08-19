@@ -152,10 +152,14 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         // classify photons
         const ATL24::xgboost::ClassificationResult classification = ATL24::main_pipeline::classify (p, model_filename.c_str(), true, ensemble_params);
         if(classification.labels.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned labels: %lu != %lu", classification.labels.size(), num_rows);
-        for(size_t i; i < classification.labels.size(); i++) p[i].class_ph = classification.labels[i]; // class_ph needs to be populated for kd and surface roughness algorithms
+        for(size_t i = 0; i < classification.labels.size(); i++) // class_ph and labels needs to be populated for kd and surface roughness algorithms
+        {
+            p[i].class_ph = classification.labels[i];
+            p[i].label    = static_cast<ATL24::photon::Label>(classification.labels[i]);
+        }
 
         // generate sea surface elevation
-        const vector<ATL24::elevations::Elevations> elevations = get_elevations (p, elevations_params);
+        const vector<ATL24::elevations::Elevations> elevations = ATL24::elevations::get_elevations (p, elevations_params);
         if(elevations.size() != num_rows) throw RunTimeException(CRITICAL, RTE_FAILURE, "size mismatch in returned elevations: %lu != %lu", elevations.size(), num_rows);
 
         // estimate kd
@@ -170,7 +174,7 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         if(serialize) experiment.unlock();
 
         // update new dataframe columns
-        for(size_t i; i < num_rows; i++)
+        for(size_t i=0; i < num_rows; i++)
         {
             class_ph->append(classification.labels[i]);
             confidence->append(classification.probabilities[i][ATL24::labeling::label_map.at(static_cast<int>(ATL24::photon::Label::bathy))]);
@@ -178,6 +182,10 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
             kd->append(static_cast<float>(kd_estimates[i]));
             surface_roughness->append(static_cast<float>(estimated_surface_roughness[i]));
         }
+
+        // status of completion
+        mlog(INFO, "Finished classifier on spot %d with %lu rows", df.spot.value, num_rows);
+
     }
     catch(const std::exception& e)
     {
