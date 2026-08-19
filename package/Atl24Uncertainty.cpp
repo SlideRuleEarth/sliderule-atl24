@@ -53,21 +53,21 @@ const struct luaL_Reg Atl24Uncertainty::LUA_META_TABLE[] = {
 };
 
 const char* Atl24Uncertainty::UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLES] = {
-   {"/data/SNR_ATLAS_1_deg.csv",
-    "/data/SNR_ATLAS_2_deg.csv",
-    "/data/SNR_ATLAS_3_deg.csv",
-    "/data/SNR_ATLAS_4_deg.csv",
-    "/data/SNR_ATLAS_5_deg.csv"},
-   {"/data/THU_ATLAS_1_deg.csv",
-    "/data/THU_ATLAS_2_deg.csv",
-    "/data/THU_ATLAS_3_deg.csv",
-    "/data/THU_ATLAS_4_deg.csv",
-    "/data/THU_ATLAS_5_deg.csv"},
-   {"/data/Transport_ATLAS_1_deg.csv",
-    "/data/Transport_ATLAS_2_deg.csv",
-    "/data/Transport_ATLAS_3_deg.csv",
-    "/data/Transport_ATLAS_4_deg.csv",
-    "/data/Transport_ATLAS_5_deg.csv"}
+   {"SNR_ATLAS_1_deg.csv",
+    "SNR_ATLAS_2_deg.csv",
+    "SNR_ATLAS_3_deg.csv",
+    "SNR_ATLAS_4_deg.csv",
+    "SNR_ATLAS_5_deg.csv"},
+   {"THU_ATLAS_1_deg.csv",
+    "THU_ATLAS_2_deg.csv",
+    "THU_ATLAS_3_deg.csv",
+    "THU_ATLAS_4_deg.csv",
+    "THU_ATLAS_5_deg.csv"},
+   {"Transport_ATLAS_1_deg.csv",
+    "Transport_ATLAS_2_deg.csv",
+    "Transport_ATLAS_3_deg.csv",
+    "Transport_ATLAS_4_deg.csv",
+    "Transport_ATLAS_5_deg.csv"}
 };
 
 // WIND_SPEED_INDEX[wind_speed] --> index
@@ -165,15 +165,15 @@ void Atl24Uncertainty::init (void)
         for(int pointing_angle_index = 0; pointing_angle_index < NUM_POINTING_ANGLES; pointing_angle_index++)
         {
             /* get uncertainty filename */
-            const char* uncertainty_filename = UNCERTAINTY_FILENAMES[dim][pointing_angle_index];
-            mlog(INFO, "Processing uncertainty file: %s", uncertainty_filename);
+            const FString uncertainty_filename("%s/%s", CONFDIR, UNCERTAINTY_FILENAMES[dim][pointing_angle_index]);
+            print2term("Processing uncertainty file: %s\n", uncertainty_filename.c_str());
 
             /* open csv file */
-            fileptr_t file = fopen(uncertainty_filename, "r");
+            fileptr_t file = fopen(uncertainty_filename.c_str(), "r");
             if(!file)
             {
                 char err_buf[256];
-                mlog(CRITICAL, "Failed to open file %s with error: %s", uncertainty_filename, strerror_r(errno, err_buf, sizeof(err_buf))); // Get thread-safe error message
+                print2term("Failed to open file %s with error: %s\n", uncertainty_filename.c_str(), strerror_r(errno, err_buf, sizeof(err_buf))); // Get thread-safe error message
                 continue;
             }
 
@@ -181,7 +181,7 @@ void Atl24Uncertainty::init (void)
             char header[40];
             if(fscanf(file, "%39s\n", header) <= 0)
             {
-                mlog(CRITICAL, "Failed to read header from uncertainty file %s", uncertainty_filename);
+                print2term("Failed to read header from uncertainty file %s\n", uncertainty_filename.c_str());
                 fclose(file);
                 continue;
             }
@@ -200,7 +200,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[SNR_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[SNR_DIM][pointing_angle_index]);
                     }
                 }
             }
@@ -218,7 +218,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[THU_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[THU_DIM][pointing_angle_index]);
                     }
                 }
             }
@@ -236,7 +236,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        mlog(CRITICAL, "Row %d in %s is ignored", row, UNCERTAINTY_FILENAMES[TRANSPORT_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[TRANSPORT_DIM][pointing_angle_index]);
                     }
                 }
             }
@@ -369,6 +369,7 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
 
             /* subaqueous horizontal uncertainty */
             subaqueous_horizontal_uncertainty = 0.577 * (thu.a + (thu.b * depth)); // [22]
+printf("UNCERTAINTY: %lf %lf %lf %d\n", transport_uncertainty, signal_uncertainty, subaqueous_horizontal_uncertainty, entry_index);
         }
 
         /* total uncertainties */

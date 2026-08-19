@@ -82,6 +82,21 @@ install (
 install (
     FILES
         ${ATL24DIR}/models/atl24.tgz
+        ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_1_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_2_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_3_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_4_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_5_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/THU_ATLAS_1_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/THU_ATLAS_2_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/THU_ATLAS_3_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/THU_ATLAS_4_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/THU_ATLAS_5_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/Transport_ATLAS_1_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/Transport_ATLAS_2_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/Transport_ATLAS_3_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/Transport_ATLAS_4_deg.csv
+        ${CMAKE_CURRENT_LIST_DIR}/tables/Transport_ATLAS_5_deg.csv
     DESTINATION
         ${CONFDIR}
 )

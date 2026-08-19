@@ -455,6 +455,28 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "units", "meters");
             goto_parent(datasets);
 
+            /* Create Variable - kd */
+            FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(df->getColumn("kd"));
+            add_variable(datasets, "kd", kd);
+            add_attribute(datasets, "contentType", "modelResult");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "Turbidity of water column calculated using only ICESat-2 photons");
+            add_attribute(datasets, "long_name", "Turbidity");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "meters");
+            goto_parent(datasets);
+
+            /* Create Variable - surface_roughness */
+            FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(df->getColumn("surface_roughness"));
+            add_variable(datasets, "surface_roughness", kd);
+            add_attribute(datasets, "contentType", "modelResult");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "Measure of wave heights and proxy for wind speed in uncertainty calculation");
+            add_attribute(datasets, "long_name", "Surface Roughness");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "meters");
+            goto_parent(datasets);
+
             /* Go Back to Parent Group */
             goto_parent(datasets);
         }
