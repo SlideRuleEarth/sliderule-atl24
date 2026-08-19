@@ -37,9 +37,6 @@ repeat
             ["format"] = "geoparquet",
             ["path"] = parquet_output_file,
             ["with_checksum"] = true
-        },
-        ["beams"] = {
-            "gt1l"
         }
     }
 
