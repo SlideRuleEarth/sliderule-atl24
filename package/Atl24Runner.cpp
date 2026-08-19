@@ -174,6 +174,7 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
         {
             class_ph->append(classification.labels[i]);
             confidence->append(classification.probabilities[i][ATL24::labeling::label_map.at(static_cast<int>(ATL24::photon::Label::bathy))]);
+            surface_h->append(static_cast<float>(elevations[i].sea_surface_elevation));
             kd->append(static_cast<float>(kd_estimates[i]));
             surface_roughness->append(static_cast<float>(estimated_surface_roughness[i]));
         }
@@ -186,8 +187,8 @@ bool Atl24Runner::run (GeoDataFrame* dataframe)
 
     // add columns to dataframe
     df.addExistingColumn("class_ph",            class_ph,           "photon classification");
-    df.addExistingColumn("surface_h",           surface_h,          "surface elevation");
     df.addExistingColumn("confidence",          confidence,         "bathymetry classification probability");
+    df.addExistingColumn("surface_h",           surface_h,          "surface elevation");
     df.addExistingColumn("kd",                  kd,                 "turbidity");
     df.addExistingColumn("surface_roughness",   surface_roughness,  "surface roughness");
 

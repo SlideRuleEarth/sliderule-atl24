@@ -56,6 +56,7 @@ target_sources(atl24
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/package/atl24_plugin.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Runner.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Uncertainty.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/Atl24Writer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/BlunderRunner.cpp
         ${CMAKE_CURRENT_LIST_DIR}/package/PluginFields.cpp

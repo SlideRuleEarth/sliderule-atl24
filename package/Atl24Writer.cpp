@@ -57,8 +57,6 @@ const struct luaL_Reg Atl24Writer::LUA_META_TABLE[] = {
     {NULL,          NULL}
 };
 
-const char* Atl24Writer::RELEASE = "03";
-
 const char* Atl24Writer::BEAMS[NUM_BEAMS] = {"gt1l", "gt1r", "gt2l", "gt2r", "gt3l", "gt3r"};
 
 /******************************************************************************
@@ -155,6 +153,7 @@ int Atl24Writer::luaCreate (lua_State* L)
         int parms_index = 1;
         int dataframe_table_index = 2;
         int granule_index = 3;
+        int release_index = 4;
 
         /* Get Parameters */
         _parms = dynamic_cast<Icesat2Parameters*>(getLuaObject(L, parms_index, Icesat2Parameters::OBJECT_TYPE));
@@ -176,8 +175,11 @@ int Atl24Writer::luaCreate (lua_State* L)
         /* Get Granule */
         _granule = dynamic_cast<Atl03Granule*>(getLuaObject(L, granule_index, Atl03Granule::OBJECT_TYPE));
 
+        /* Get Release Number */
+        const char* _release = getLuaString(L, release_index);
+
         /* Return Dispatch Object */
-        return createLuaObject(L, new Atl24Writer(L, _parms, _dataframes, _granule));
+        return createLuaObject(L, new Atl24Writer(L, _parms, _dataframes, _granule, _release));
     }
     catch(const RunTimeException& e)
     {
@@ -195,9 +197,9 @@ int Atl24Writer::luaCreate (lua_State* L)
 /*----------------------------------------------------------------------------
  * Constructor
  *----------------------------------------------------------------------------*/
-Atl24Writer::Atl24Writer(lua_State* L, Icesat2Parameters* _parms, BathyDataFrame** _dataframes, Atl03Granule* _granule):
+Atl24Writer::Atl24Writer(lua_State* L, Icesat2Parameters* _parms, BathyDataFrame** _dataframes, Atl03Granule* _granule, const char* _release):
     LuaObject(L, OBJECT_TYPE, LUA_META_NAME, LUA_META_TABLE),
-    release(RELEASE),
+    release(FString("0%s", _release).c_str()),
     parms(_parms),
     granule(_granule)
 {
@@ -253,7 +255,6 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         PluginFields pluginFields;
         FieldElement<string> atl24_metadata(pluginFields.toJson());
         FieldElement<string> rqst_metadata(parms->toJson());
-
 
         /**********************/
         /* Create Beam Groups */
@@ -401,26 +402,28 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "units", "meters");
             goto_parent(datasets);
 
-//            /* Create Variable - sigma_thu */
-//            add_variable(datasets, "sigma_thu", &df->sigma_thu);
-//            add_attribute(datasets, "contentType", "physicalMeasurement");
-//            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-//            add_attribute(datasets, "description", "The combination of the aerial and subaqueous horizontal uncertainty for each received photon");
-//            add_attribute(datasets, "long_name", "Total horizontal uncertainty");
-//            add_attribute(datasets, "source", "ATL03");
-//            add_attribute(datasets, "units", "meters");
-//            goto_parent(datasets);
-//
-//            /* Create Variable - sigma_tvu */
-//            add_variable(datasets, "sigma_tvu", &df->sigma_tvu);
-//            add_attribute(datasets, "contentType", "modelResult");
-//            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-//            add_attribute(datasets, "description", "The combination of the aerial and subaqueous vertical uncertainty for each received photon");
-//            add_attribute(datasets, "long_name", "Total vertical uncertainty");
-//            add_attribute(datasets, "source", "ATL03");
-//            add_attribute(datasets, "units", "meters");
-//            goto_parent(datasets);
-//
+            /* Create Variable - sigma_thu */
+            FieldColumn<float>* sigma_thu = reinterpret_cast<FieldColumn<float>*>(df->getColumn("sigma_thu"));
+            add_variable(datasets, "sigma_thu", sigma_thu);
+            add_attribute(datasets, "contentType", "physicalMeasurement");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "The combination of the aerial and subaqueous horizontal uncertainty for each received photon");
+            add_attribute(datasets, "long_name", "Total horizontal uncertainty");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "meters");
+            goto_parent(datasets);
+
+            /* Create Variable - sigma_tvu */
+            FieldColumn<float>* sigma_tvu = reinterpret_cast<FieldColumn<float>*>(df->getColumn("sigma_tvu"));
+            add_variable(datasets, "sigma_tvu", sigma_tvu);
+            add_attribute(datasets, "contentType", "modelResult");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "The combination of the aerial and subaqueous vertical uncertainty for each received photon");
+            add_attribute(datasets, "long_name", "Total vertical uncertainty");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "meters");
+            goto_parent(datasets);
+
             /* Create Variable - surface_h */
             FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(df->getColumn("surface_h"));
             add_variable(datasets, "surface_h", surface_h);

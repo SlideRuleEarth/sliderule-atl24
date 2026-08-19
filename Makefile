@@ -77,7 +77,7 @@ test-docker-run:
 		$(CONTAINER_REGISTRY)/sliderule:runner \
 		/usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/gen_atl24r3.lua ATL03_20181027185143_04450108_006_02.h5 /tmp
 
-test-atl24-run:
+test-atl24-run: install
 	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/utils/gen_atl24r3.lua ATL03_20181028071900_04530107_006_02.h5 /tmp"
 
 clean:

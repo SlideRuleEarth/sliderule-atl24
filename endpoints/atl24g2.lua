@@ -69,7 +69,7 @@ local function main()
 
     -- create atl24 release 02 granule
     local tmp_filename = string.format("/tmp/atl24-%s.h5", _rqst.id)
-    local atl24_file = atl24.hdf5file(parms, dataframes, granule)
+    local atl24_file = atl24.writer(parms, dataframes, granule)
     atl24_file:write(tmp_filename)
 
     -- send new atl24 releas 02 granule to user

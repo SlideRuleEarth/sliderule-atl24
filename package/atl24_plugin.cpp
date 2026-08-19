@@ -37,6 +37,7 @@
 #include "Atl03Granule.h"
 
 #include "Atl24Runner.h"
+#include "Atl24Uncertainty.h"
 #include "Atl24Writer.h"
 #include "BlunderRunner.h"
 
@@ -88,6 +89,7 @@ int atl24_open (lua_State *L)
         {"blunder",         BlunderRunner::luaCreate},
         {"classifier",      Atl24Runner::luaCreate},
         {"writer",          Atl24Writer::luaCreate},
+        {"uncertainty",     Atl24Uncertainty::luaCreate},
         {"atl03granule",    Atl03Granule::luaCreate},
         {NULL,              NULL}
     };
@@ -105,6 +107,7 @@ extern "C" {
 void initatl24 (void)
 {
     /* Initialize Modules */
+    Atl24Uncertainty::init();
     Atl24Writer::init();
 
     /* Extend Lua */

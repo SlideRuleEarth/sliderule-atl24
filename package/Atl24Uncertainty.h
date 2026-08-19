@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, University of Washington
+ * Copyright (c) 2023, University of Texas
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,14 +12,14 @@
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
- * 3. Neither the name of the University of Washington nor the names of its
+ * 3. Neither the name of the University of Texas nor the names of its
  *    contributors may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON AND CONTRIBUTORS
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF TEXAS AND CONTRIBUTORS
  * “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY OF WASHINGTON OR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY OF TEXAS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
@@ -29,27 +29,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __atl24_writer__
-#define __atl24_writer__
-
-/******************************************************************************
- * INCLUDES
- ******************************************************************************/
+#ifndef __atl24_uncertainty__
+#define __atl24_uncertainty__
 
 #include "OsApi.h"
-#include "EventLib.h"
-#include "LuaObject.h"
-#include "HdfLib.h"
-#include "FieldElement.h"
-#include "Icesat2Parameters.h"
+#include "GeoDataFrame.h"
+#include "H5CoroLib.h"
+#include "H5Array.h"
+#include "BathyParameters.h"
 #include "BathyDataFrame.h"
-#include "Atl03Granule.h"
 
 /******************************************************************************
- * CLASS DECLARATION
+ * CLASS
  ******************************************************************************/
 
-class Atl24Writer: public LuaObject
+class Atl24Uncertainty: public GeoDataFrame::FrameRunner
 {
     public:
 
@@ -57,45 +51,63 @@ class Atl24Writer: public LuaObject
          * Constants
          *--------------------------------------------------------------------*/
 
-        static const char* OBJECT_TYPE;
         static const char* LUA_META_NAME;
         static const struct luaL_Reg LUA_META_TABLE[];
 
-        static const int NUM_BEAMS = Icesat2Parameters::NUM_SPOTS;
-        static const char* BEAMS[NUM_BEAMS];
+        /*--------------------------------------------------------------------
+         * Methods
+         *--------------------------------------------------------------------*/
+
+        static int      luaCreate   (lua_State* L);
+        static void     init        (void);
+        bool            run         (GeoDataFrame* dataframe) override;
+
+    private:
 
         /*--------------------------------------------------------------------
          * Typedefs
          *--------------------------------------------------------------------*/
 
+        typedef struct {
+            int Wind;
+            char JerlovType[16];
+            double a;
+            double b;
+            double c;
+        } entry_t;
+
+        typedef enum {
+            SNR_DIM = 0,
+            THU_DIM = 1,
+            TRANSPORT_DIM = 2,
+            NUM_DIMS = 3,
+        } uncertainty_dim_t;
+
         /*--------------------------------------------------------------------
          * Methods
          *--------------------------------------------------------------------*/
 
-        static void init (void);
-
-        static int luaCreate (lua_State* L);
-
-    private:
-
-        /*--------------------------------------------------------------------
-         * Methods
-         *--------------------------------------------------------------------*/
-
-        Atl24Writer  (lua_State* L, Icesat2Parameters* _parms, BathyDataFrame** _dataframes, Atl03Granule* _granule, const char* _release);
-        ~Atl24Writer (void) override;
-
-        static int luaWriteFile (lua_State* L);
+        Atl24Uncertainty  (lua_State* L, BathyParameters* _parms);
+        ~Atl24Uncertainty (void) override;
 
         /*--------------------------------------------------------------------
          * Data
          *--------------------------------------------------------------------*/
 
-        FieldElement<string> release; // standard data product release number
+        static const int            NUM_POINTING_ANGLES = 5;
+        static const int            NUM_WIND_SPEEDS = 10;
+        static const int            NUM_KDS = 50;
 
-        Icesat2Parameters* parms;
-        BathyDataFrame* dataframes[NUM_BEAMS];
-        Atl03Granule* granule;
+        static const int            WIND_SPEED_INDEX[NUM_WIND_SPEEDS];
+        static const int            KD_INDEX[NUM_KDS];
+
+        static const char*          UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLES];
+
+        static vector<entry_t>      SNR[NUM_POINTING_ANGLES];
+        static vector<entry_t>      THU[NUM_POINTING_ANGLES];
+        static vector<entry_t>      TRANSPORT[NUM_POINTING_ANGLES];
+
+        BathyParameters*            parms;
 };
 
-#endif  /* __atl24_writer__ */
+#endif

@@ -2,6 +2,7 @@
 local json          = require("json")
 local aws_utils     = require("aws_utils")
 local _, build      = sys.version()
+local release       = "3"
 local timeout       = 3600 * 1000
 local result        = { status = true, build = build, start = time.latch(), messages = {} }
 local consoleq      = msg.subscribe("consoleq") -- prevents error posting to consoleq
@@ -26,8 +27,8 @@ repeat
     end
 
     -- output files
-    local parquet_output_file = resource:gsub("ATL03", "atl24r3/parquet/ATL24"):gsub(".h5", "003_01.parquet")
-    local h5_output_file = resource:gsub("ATL03", "atl24r3/h5/ATL24"):gsub(".h5", "003_01.h5")
+    local parquet_output_file = resource:gsub("ATL03", string.format("atl24r%s/parquet/ATL24", release)):gsub("%.h5", string.format("_00%s_01.parquet", release))
+    local h5_output_file = resource:gsub("ATL03", string.format("atl24r%s/h5/ATL24", release)):gsub("%.h5", string.format("_00%s_01.h5", release))
 
     -- request structure
     local rqst = {
@@ -47,15 +48,16 @@ repeat
     end
 
     -- create objects used in processing granule
-    local parms             = bathy.parms(rqst, nil, "icesat2", resource)
-    local bathymask         = bathy.mask()
-    local atl03h5           = h5coro.object(parms["asset"], resource)
-    local granule           = icesat2.atl03granule(parms, atl03h5, "consoleq")
-    local classifier        = atl24.classifier(parms)
-    local refractor         = bathy.refraction(parms)
-    local sender            = core.framesender(parms, "rspq")
-    local dataframe         = core.dataframe({}, {granule=resource, request=json.encode(rqst)})
-    local dataframes        = {} -- holds beam dataframes
+    local parms         = bathy.parms(rqst, nil, "icesat2", resource)
+    local bathymask     = bathy.mask()
+    local atl03h5       = h5coro.object(parms["asset"], resource)
+    local granule       = icesat2.atl03granule(parms, atl03h5, "consoleq")
+    local classifier    = atl24.classifier(parms)
+    local refractor     = bathy.refraction(parms)
+    local uncertainty   = atl24.uncertainty(parms)
+    local sender        = core.framesender(parms, "rspq")
+    local dataframe     = core.dataframe({}, {granule=resource, request=json.encode(rqst)})
+    local dataframes    = {} -- holds beam dataframes
 
     -- build final dataframe from beam dataframes
     dataframe:receive("rspq", "consoleq", 6, timeout)
@@ -63,7 +65,8 @@ repeat
         local df = bathy.dataframe(beam, parms, bathymask, atl03h5, "consoleq")
         if df then
             df:run(classifier)
---            df:run(refractor)
+            df:run(refractor)
+            df:run(uncertainty)
             df:run(sender)
             df:run(core.TERMINATE)
             dataframes[beam] = df
@@ -127,8 +130,8 @@ repeat
     end
 
     -- write dataframes to h5 file
-    local tmp_filename = string.format("/tmp/%s", h5_output_file)
-    local atl24_file = atl24.hdf5file(parms, dataframes, granule)
+    local tmp_filename = string.format("/tmp/%s", resource:gsub("ATL03", "TMP"):gsub("%.h5", ".bin"))
+    local atl24_file = atl24.writer(parms, dataframes, granule)
     local write_status = atl24_file:write(tmp_filename)
     if not write_status then
         table.insert(result["messages"], "failed to write h5 file")
@@ -137,7 +140,7 @@ repeat
     end
 
     -- send h5 file to s3
-    local h5_status = core.send2user(tmp_filename, _rqst.rspq, parms, h5_output_file)
+    local h5_status = core.send2user(tmp_filename, "consoleq", parms, h5_output_file)
     if not h5_status then
         table.insert(result["messages"], "failed to send h5 file")
         result["status"] = false
