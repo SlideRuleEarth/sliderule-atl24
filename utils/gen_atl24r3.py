@@ -2,6 +2,8 @@ import importlib
 import boto3
 import sys
 import json
+import random
+import string
 import argparse
 from sliderule import sliderule
 
@@ -82,8 +84,13 @@ def submit_job(name, granules):
     # process job in batches
     for i in range(0, len(granules), args.batch_size):
 
-        # submit job
+        # build and check name
         name = f"{name}_{i}"
+        if name in database["submissions"]:
+            unique = ''.join(random.choices(string.ascii_lowercase, k=3))
+            name = f"{name}_{unique}_{i}"
+
+        # submit job
         args_list = granules[i:i+args.batch_size]
         lua_script = open(args.script, "r").read()
         rsps = session.runner.submit(name=name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
