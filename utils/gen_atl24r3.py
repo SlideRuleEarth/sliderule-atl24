@@ -105,7 +105,7 @@ if args.verify:
     # get granules from verification list
     with open(args.vset, "r") as file:
         lines = file.readlines()
-        granules = [line.strip().replace("_006_01", "_006_02")+ ".h5" for line in lines if len(line) > 30]
+        granules = [line.strip() + ".h5" for line in lines if len(line) > 30]
 
     # submit job
     submit_job("atl24r3_vset", granules)
