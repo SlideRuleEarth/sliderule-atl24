@@ -131,8 +131,8 @@ if args.verify:
     with open(args.vset, "r") as file:
         lines = file.readlines()
         granules = [line.strip().replace("_006_01", "_006_02")+ ".h5" for line in lines if len(line) > 30]
-        if args.test: # just pull out one granule to run
-            granules = granules[1:2]
+        if args.test: # just pull out two granules to run (the current batch api requires at least two jobs to be submitted)
+            granules = granules[1:3]
 
     # process granules in batches
     for i in range(0, len(granules), args.batch_size):
@@ -199,7 +199,7 @@ if args.status:
 
     # display status
     columns = ["SUCCEEDED", "FAILED", "RUNNING", "STARTING", "RUNNABLE", "PENDING", "SUBMITTED"]
-    print(",".join([f"{c:>10}" for c in ["NAME"] + columns]))
+    print(",".join([f"{c:>10}" for c in ["          NAME"] + columns]))
     for name,job in database["submissions"].items():
         print(",".join([f"{c:>10}" for c in [name] + [job["status"][state] for state in columns]]))
 
