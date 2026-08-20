@@ -3,7 +3,7 @@ local json          = require("json")
 local aws_utils     = require("aws_utils")
 local _, build      = sys.version()
 local release       = "3"
-local timeout       = 3600 * 1000
+local timeout       = 5400 * 1000
 local result        = { status = true, build = build, start = time.latch(), messages = {} }
 local consoleq      = msg.subscribe("consoleq") -- prevents error posting to consoleq
 

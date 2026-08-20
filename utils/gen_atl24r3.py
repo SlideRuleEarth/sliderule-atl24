@@ -1,5 +1,6 @@
 import importlib
 import boto3
+import sys
 import json
 import argparse
 from sliderule import sliderule
@@ -16,6 +17,7 @@ except Exception:
 #########################################
 parser = argparse.ArgumentParser(description="""Kd Experiment""")
 parser.add_argument('--cycle',      type=int,               default=None) # 1, 2, 3, etc.
+parser.add_argument('--rerun',      type=str,               default=None) # name of run (e.g. rerun_32GB)
 parser.add_argument('--vcpus',      type=int,               default=4)
 parser.add_argument('--memory',     type=int,               default=16000)
 parser.add_argument('--batch_size', type=int,               default=10000)
@@ -23,7 +25,6 @@ parser.add_argument('--script',     type=str,               default="utils/gen_a
 parser.add_argument('--database',   type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--vset',       type=str,               default="data/atl24r3_verification_set.txt")
 parser.add_argument('--verify',     action='store_true',    default=False)
-parser.add_argument('--test',       action='store_true',    default=False)
 parser.add_argument('--status',     action='store_true',    default=False)
 parser.add_argument('--report',     action='store_true',    default=False)
 args = parser.parse_args()
@@ -74,71 +75,15 @@ session = sliderule.create_session(verbose=True)
 session.authenticate() # gives privileges to access SlideRule Runner
 
 #########################################
-# function: get argument list
+# function: submit job
 #########################################
-def get_args_list(cycle):
+def submit_job(name, granules):
 
-    print(f"Requesting ATL03 granules from CMR for cycle {cycle}")
-    atl03_granules = sliderule.source("earthdata", {
-        "asset": "icesat2",
-        "cycle": cycle,
-        "max_resources": 100000
-    })
-    print(f"Retrieved list of {len(atl03_granules)} granules to process")
-
-    return [f"{granule}" for granule in atl03_granules]
-
-#########################################
-# function: get results
-#########################################
-def get_results(run_url):
-
-    results = {}
-
-    s3 = boto3.client("s3", region_name="us-west-2")
-    def load_remote_file(bucket, key):
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        contents = obj["Body"].read().decode("utf-8")
-        return json.loads(contents)
-    bucket = run_url.split("s3://")[-1].split("/")[0]
-    prefix = "/".join(run_url.split("s3://")[-1].split("/")[1:])
-    rsps = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
-    args_list = load_remote_file(bucket, rsps["args"])
-
-    for i in tqdm(range(len(args_list)), total=len(args_list), desc=f"{run_url}", unit="granule"):
-        granule,_ = args_list[i].split(",")
-        try:
-            result = {}
-            rsps = load_remote_file(bucket, f"{prefix}/result{i}.json")
-            if not rsps["status"] or "output" not in rsps:
-                result["status"] = "empty"
-            else:
-                result["status"] = "output"
-                result["output"] = rsps["output"]
-                result["duration"] = rsps["stop"] - rsps["start"]
-        except Exception as e:
-            result = {"status": "error"}
-        results[granule] = result
-
-    return results
-
-#########################################
-# process granules for verification
-#########################################
-if args.verify:
-
-    # get granules from verification set
-    with open(args.vset, "r") as file:
-        lines = file.readlines()
-        granules = [line.strip().replace("_006_01", "_006_02")+ ".h5" for line in lines if len(line) > 30]
-        if args.test: # just pull out two granules to run (the current batch api requires at least two jobs to be submitted)
-            granules = granules[1:3]
-
-    # process granules in batches
+    # process job in batches
     for i in range(0, len(granules), args.batch_size):
 
         # submit job
-        name = f"atl24r3_vset_{i}"
+        name = f"{name}_{i}"
         args_list = granules[i:i+args.batch_size]
         lua_script = open(args.script, "r").read()
         rsps = session.runner.submit(name=name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
@@ -153,33 +98,89 @@ if args.verify:
             database["granules"][granule] = {"name": name, "status": "pending"}
 
 #########################################
+# process granules for verification
+#########################################
+if args.verify:
+
+    # get granules from verification list
+    with open(args.vset, "r") as file:
+        lines = file.readlines()
+        granules = [line.strip().replace("_006_01", "_006_02")+ ".h5" for line in lines if len(line) > 30]
+
+    # submit job
+    submit_job("atl24r3_vset", granules)
+
+#########################################
+# rerun granules that have failed
+#########################################
+if args.rerun:
+
+    # check argument
+    if not isinstance(args.rerun, str) or len(args.rerun) == 0:
+        print("Must supply name for the rerun job")
+        sys.exit(1)
+
+    # get granules from database set
+    granules = []
+    for granule,result in database["granules"].items():
+        if result["status"] == "error":
+            granules.append(granule)
+
+    # submit job
+    submit_job(args.rerun, granules)
+
+#########################################
 # process granules for cycle
 #########################################
 if args.cycle:
 
-    # get all arguments for the cycle
-    args_for_cycle = get_args_list(args.cycle)
-    for i in range(0, len(args_for_cycle), args.batch_size):
+    # get list of granules to process
+    print(f"Requesting ATL03 granules from CMR for cycle {args.cycle}")
+    atl03_granules = sliderule.source("earthdata", {
+        "asset": "icesat2",
+        "cycle": args.cycle,
+        "max_resources": 100000
+    })
+    print(f"Retrieved list of {len(atl03_granules)} granules to process")
+    granules = [f"{granule}" for granule in atl03_granules]
 
-        # submit job
-        name = f"atl24r3_{args.cycle}_{i}"
-        args_list = args_for_cycle[i:i+args.batch_size]
-        lua_script = open(args.script, "r").read()
-        rsps = session.runner.submit(name=name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
-        print(f"Submitted job {name} using script {args.script} with {len(args_list)} entries")
-
-        # save job
-        database["submissions"][name] = rsps | {"complete": False}
-        print(f"Saved job submission", rsps)
-
-        # save granules
-        for granule in args_list:
-            database["granules"][granule] = {"name": name, "status": "pending"}
+    # submit job
+    submit_job(f"atl24r3_{args.cycle}", granules)
 
 #########################################
 # status jobs
 #########################################
 if args.status:
+
+    # s3 client
+    s3 = boto3.client("s3", region_name="us-west-2")
+
+    # local function: load remote file from s3
+    def load_remote_file(bucket, key):
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        contents = obj["Body"].read().decode("utf-8")
+        return json.loads(contents)
+
+    # local function: get results for a job run
+    def get_results(run_url):
+        results = {}
+        bucket = run_url.split("s3://")[-1].split("/")[0]
+        prefix = "/".join(run_url.split("s3://")[-1].split("/")[1:])
+        rsps = load_remote_file(bucket, f"{prefix}/receipt.json") # {"name": ..., "username": ... "args": <path to arg file>, "environment": ...}
+        args_list = load_remote_file(bucket, rsps["args"])
+        for i in tqdm(range(len(args_list)), total=len(args_list), desc=f"{run_url}", unit="granule"):
+            try:
+                rsps = load_remote_file(bucket, f"{prefix}/result{i}.json")
+                result = {
+                    "status": rsps["status"] and "output" or "empty",
+                    "duration": rsps["status"] and (rsps["stop"] - rsps["start"]) or 0.0,
+                    "rsps": rsps
+                }
+            except Exception as e:
+                result = {"status": "error"}
+            granule = args_list[i]
+            results[granule] = result
+        return results
 
     # get status
     for name,job in database["submissions"].items():
@@ -199,9 +200,10 @@ if args.status:
 
     # display status
     columns = ["SUCCEEDED", "FAILED", "RUNNING", "STARTING", "RUNNABLE", "PENDING", "SUBMITTED"]
-    print(",".join([f"{c:>10}" for c in ["          NAME"] + columns]))
+
+    print(",".join([f"{c:>30}" for c in ["NAME"]] + [f"{c:>10}" for c in columns]))
     for name,job in database["submissions"].items():
-        print(",".join([f"{c:>10}" for c in [name] + [job["status"][state] for state in columns]]))
+        print(",".join([f"{c:>30}" for c in [name]] + [f"{c:>10}" for c in [job["status"][state] for state in columns]]))
 
 #########################################
 # report on status of granules
