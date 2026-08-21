@@ -20,7 +20,7 @@ runner.unittest("ATL24 HDF5 Writer", function()
     local gt1l      = icesat2.atl24x("gt1l", parms, atl24h5, "rspq")
     local status    = gt1l:waiton(10000, "rspq")
     runner.assert(status, "failed to create dataframe", true)
-    local atl24_file = atl24.writer(parms, {gt1l=gt1l}, granule)
+    local atl24_file = atl24.writer(parms, {gt1l=gt1l}, granule, "X")
     runner.assert(atl24_file:write("/tmp/atl24.h5"))
 end)
 
