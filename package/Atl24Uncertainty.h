@@ -94,7 +94,7 @@ class Atl24Uncertainty: public GeoDataFrame::FrameRunner
          * Data
          *--------------------------------------------------------------------*/
 
-        static const int            NUM_POINTING_ANGLES = 5;
+        static const int            NUM_POINTING_ANGLES = 6;
         static const int            NUM_WIND_SPEEDS = 10;
         static const int            NUM_KDS = 50;
 

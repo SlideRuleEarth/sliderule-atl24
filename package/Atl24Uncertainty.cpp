@@ -53,17 +53,20 @@ const struct luaL_Reg Atl24Uncertainty::LUA_META_TABLE[] = {
 };
 
 const char* Atl24Uncertainty::UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLES] = {
-   {"SNR_ATLAS_1_deg.csv",
+   {"SNR_ATLAS_0_deg.csv",
+    "SNR_ATLAS_1_deg.csv",
     "SNR_ATLAS_2_deg.csv",
     "SNR_ATLAS_3_deg.csv",
     "SNR_ATLAS_4_deg.csv",
     "SNR_ATLAS_5_deg.csv"},
-   {"THU_ATLAS_1_deg.csv",
+   {"THU_ATLAS_0_deg.csv",
+    "THU_ATLAS_1_deg.csv",
     "THU_ATLAS_2_deg.csv",
     "THU_ATLAS_3_deg.csv",
     "THU_ATLAS_4_deg.csv",
     "THU_ATLAS_5_deg.csv"},
-   {"Transport_ATLAS_1_deg.csv",
+   {"Transport_ATLAS_0_deg.csv",
+    "Transport_ATLAS_1_deg.csv",
     "Transport_ATLAS_2_deg.csv",
     "Transport_ATLAS_3_deg.csv",
     "Transport_ATLAS_4_deg.csv",
@@ -269,32 +272,20 @@ Atl24Uncertainty::~Atl24Uncertainty (void)
  *----------------------------------------------------------------------------*/
 bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
 {
-    BathyDataFrame& df = *dynamic_cast<BathyDataFrame*>(dataframe);
-
     /* get input columns */
-    FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(df.getColumn("surface_h", true));
-    FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(df.getColumn("kd", true));
-    FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(df.getColumn("surface_roughness", true));
+    FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("surface_h", true));
+    FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("kd", true));
+    FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("surface_roughness", true));
+    FieldColumn<float>* ref_el = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("ref_el", true));
+    FieldColumn<float>* geoid_corr_h = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("geoid_corr_h", true));
+    FieldColumn<float>* sigma_h = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("sigma_h", true));
+    FieldColumn<float>* sigma_across = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("sigma_across", true));
+    FieldColumn<float>* sigma_along = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("sigma_along", true));
 
     /* check input columns */
-    if(!surface_h || !kd || !surface_roughness)
+    if(!surface_h || !kd || !surface_roughness || !ref_el || !geoid_corr_h || !sigma_h || !sigma_across || !sigma_along)
     {
         mlog(CRITICAL, "unable to find uncertainty input columns");
-        return false;
-    }
-    else if(surface_h->length() != df.length())
-    {
-        mlog(CRITICAL, "invalid surface_h column length: %ld", surface_h->length());
-        return false;
-    }
-    else if(kd->length() != df.length())
-    {
-        mlog(CRITICAL, "invalid kd column length: %ld", kd->length());
-        return false;
-    }
-    else if(surface_roughness->length() != df.length())
-    {
-        mlog(CRITICAL, "invalid surface_roughness column length: %ld", surface_roughness->length());
         return false;
     }
 
@@ -303,10 +294,10 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
     FieldColumn<float>* sigma_tvu = new FieldColumn<float>;
 
     /* for each photon in extent */
-    for(long i = 0; i < df.length(); i++)
+    for(long i = 0; i < dataframe->length(); i++)
     {
         /* get pointing angle index */
-        const int pointing_angle_index = discretize(elrad2deg(df.ref_el[i]), 1, NUM_POINTING_ANGLES + 1) - 1;
+        const int pointing_angle_index = discretize(elrad2deg((*ref_el)[i]), 0, NUM_POINTING_ANGLES);
 
         /* get lookup table entry index */
         const int wind_speed_lookup = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS);
@@ -356,7 +347,7 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
         double transport_uncertainty = 0.0;
         double signal_uncertainty = 0.0;
         double subaqueous_horizontal_uncertainty = 0.0;
-        const double depth = (*surface_h)[i] - df.geoid_corr_h[i];
+        const double depth = (*surface_h)[i] - (*geoid_corr_h)[i];
         if(depth > 0.0)
         {
             /* transport uncertainty */
@@ -372,8 +363,8 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
         }
 
         /* total uncertainties */
-        const double total_vertical_uncertainty = sqrt(pow(df.sigma_h[i], 2) + pow(transport_uncertainty, 2) + pow(signal_uncertainty, 2)); // [19]
-        const double total_horizontal_uncertainty = sqrt(pow(df.sigma_across[i], 2) + pow(df.sigma_along[i], 2) + pow(subaqueous_horizontal_uncertainty, 2));
+        const double total_vertical_uncertainty = sqrt(pow((*sigma_h)[i], 2) + pow(transport_uncertainty, 2) + pow(signal_uncertainty, 2)); // [19]
+        const double total_horizontal_uncertainty = sqrt(pow((*sigma_across)[i], 2) + pow((*sigma_along)[i], 2) + pow(subaqueous_horizontal_uncertainty, 2));
 
         /* set uncertainties */
         sigma_tvu->append(static_cast<float>(total_vertical_uncertainty));
@@ -381,8 +372,8 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
     }
 
     /* add columns */
-    df.addExistingColumn("sigma_thu", sigma_thu, "Total horizontal uncertainty (in meters)");
-    df.addExistingColumn("sigma_tvu", sigma_tvu, "Total vertical uncertainty (in meters)");
+    dataframe->addExistingColumn("sigma_thu", sigma_thu, "Total horizontal uncertainty (in meters)");
+    dataframe->addExistingColumn("sigma_tvu", sigma_tvu, "Total vertical uncertainty (in meters)");
 
     /* mark completion */
     return true;
