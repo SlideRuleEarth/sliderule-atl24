@@ -13,7 +13,7 @@ runner.unittest("ATL24 HDF5 Writer", function()
     -- create objects used in processing granule
     local resource      = "ATL03_20241107234251_08052501_006_01.h5"
     local timeout       = 600 * 1000
-    local rqst          = {}
+    local rqst          = {beams={"gt2r"}}
     local parms         = bathy.parms(rqst, nil, "icesat2", resource)
     local bathymask     = bathy.mask()
     local atl03h5       = h5coro.object(parms["asset"], resource)

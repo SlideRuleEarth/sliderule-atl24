@@ -37,6 +37,9 @@ uninstall:
 prep:
 	mkdir -p $(BUILD)
 
+selftest: install
+	make -C $(SLIDERULE)/targets/slideruleearth run RUN_CMD=/home/jswinski/meta/sliderule-atl24/selftests/atl24_writer.lua
+
 tag:
 	echo $(VERSION) > $(ROOT)/version.txt
 	git add $(ROOT)/version.txt
