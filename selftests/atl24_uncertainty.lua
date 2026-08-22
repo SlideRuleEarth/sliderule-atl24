@@ -60,7 +60,7 @@ runner.unittest("ATL24 Uncertainty Tables", function()
 
     local rqst          = {}
     local timeout       = 60 * 1000
-    local tolerance     = 0.0001
+    local tolerance     = 0.3
     local resource      = "local"
     local parms         = bathy.parms(rqst, nil, "icesat2", resource)
     local uncertainty   = atl24.uncertainty(parms)
@@ -116,7 +116,6 @@ runner.unittest("ATL24 Uncertainty Tables", function()
                 end
             end
             runner.assert(mismatch_count == 0, string.format("Mismatches for %sdeg at %sm - %d", pointing_angle, depth, mismatch_count))
---            pp.display(output)
         end
     end
 

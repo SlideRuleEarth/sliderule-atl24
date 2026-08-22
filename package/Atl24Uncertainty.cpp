@@ -203,7 +203,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[SNR_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row++, UNCERTAINTY_FILENAMES[SNR_DIM][pointing_angle_index]);
                     }
                 }
             }
@@ -221,7 +221,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[THU_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row++, UNCERTAINTY_FILENAMES[THU_DIM][pointing_angle_index]);
                     }
                 }
             }
@@ -239,7 +239,7 @@ void Atl24Uncertainty::init (void)
                     }
                     else
                     {
-                        print2term("Row %d in %s is ignored\n", row, UNCERTAINTY_FILENAMES[TRANSPORT_DIM][pointing_angle_index]);
+                        print2term("Row %d in %s is ignored\n", row++, UNCERTAINTY_FILENAMES[TRANSPORT_DIM][pointing_angle_index]);
                     }
                 }
             }
