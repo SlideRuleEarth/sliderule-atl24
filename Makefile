@@ -60,6 +60,9 @@ docker-runner:
 	cp docker/atl24/docker-entrypoint.sh $(STAGE)
 	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:runner .
 
+docker-push:
+	docker push $(CONTAINER_REGISTRY)/sliderule:runner
+
 test-docker-run:
 	docker run \
 		--network host \
@@ -81,7 +84,6 @@ test-docker-run:
 		/usr/local/etc/sliderule/job_runner.lua $(ROOT)/utils/gen_atl24r3.lua ATL03_20181028071900_04530107_006_02.h5 /tmp
 
 test-atl24-run: install
-#	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/utils/gen_atl24r3.lua ATL03_20181028071900_04530107_006_02.h5 /tmp"
 	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/utils/gen_atl24r3.lua ATL03_20191215112656_12150507_006_01.h5 /tmp"
 
 clean:
