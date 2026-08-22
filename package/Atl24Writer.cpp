@@ -842,14 +842,14 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         uuid_t uuid;
         uuid_generate(uuid);
         uuid_unparse_lower(uuid, uuid_str);
-        const char* fileName = StringLib::find(parms->output.path.value.c_str(), '/', false);
-        if(fileName) filename += 1;
-        else fileName = parms->output.path.value.c_str();
+        const char* datasetFileName = StringLib::find(parms->output.path.value.c_str(), '/', false);
+        if(datasetFileName) datasetFileName += 1;
+        else datasetFileName = parms->output.path.value.c_str();
         add_group(datasets, "DatasetIdentification");
         add_attribute(datasets, "spatialRepresentationType", "along-track");
         add_attribute(datasets, "creationDate", creationDate.c_str());
         add_attribute(datasets, "uuid", uuid_str);
-        add_attribute(datasets, "fileName", fileName);
+        add_attribute(datasets, "fileName", datasetFileName);
         add_attribute(datasets, "VersionID", FString("0%s", lua_obj->release.value.c_str()).c_str());
         add_attribute(datasets, "language", "eng");
         add_attribute(datasets, "characterSet", "utf8");
@@ -868,6 +868,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         /*******************/
         /* Write HDF5 File */
         /*******************/
+        mlog(INFO, "Writing HDF5 file: %s", filename);
         status = HdfLib::write(filename, datasets);
     }
     catch(const RunTimeException& e)
