@@ -272,6 +272,13 @@ Atl24Uncertainty::~Atl24Uncertainty (void)
  *----------------------------------------------------------------------------*/
 bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
 {
+    /* check size */
+    if(dataframe->length() == 0)
+    {
+        mlog(CRITICAL, "Skipping uncertainty calculation, empty dataframe\n");
+        return true; // not a failure
+    }
+
     /* get input columns */
     FieldColumn<float>* surface_h = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("surface_h", true));
     FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(dataframe->getColumn("kd", true));
