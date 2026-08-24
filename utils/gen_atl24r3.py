@@ -26,7 +26,7 @@ parser.add_argument('--batch_size', type=int,               default=10000)
 parser.add_argument('--script',     type=str,               default="utils/gen_atl24r3.lua")
 parser.add_argument('--database',   type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--vset',       type=str,               default="data/atl24r3_validation_set.txt")
-parser.add_argument('--verify',     action='store_true',    default=False)
+parser.add_argument('--verify',     type=str,               default=None) # name of run (e.g. vset_run2)
 parser.add_argument('--status',     action='store_true',    default=False)
 parser.add_argument('--report',     action='store_true',    default=False)
 args = parser.parse_args()
@@ -109,13 +109,18 @@ def submit_job(name, granules):
 #########################################
 if args.verify:
 
+    # check argument
+    if not isinstance(args.verify, str) or len(args.verify) == 0:
+        print("Must supply name for the validation job")
+        sys.exit(1)
+
     # get granules from verification list
     with open(args.vset, "r") as file:
         lines = file.readlines()
-        granules = [line.strip() + ".h5" for line in lines if len(line) > 30]
+        granules = [line.strip() for line in lines if len(line) > 30]
 
     # submit job
-    submit_job("atl24r3_vset", granules)
+    submit_job(args.verify, granules)
 
 #########################################
 # rerun granules that have failed
