@@ -77,13 +77,13 @@ const char* Atl24Uncertainty::UNCERTAINTY_FILENAMES[NUM_DIMS][NUM_POINTING_ANGLE
 const int Atl24Uncertainty::WIND_SPEED_INDEX[NUM_WIND_SPEEDS] = {
     0, // 0
     0, // 1
-    1, // 2
+    0, // 2
     1, // 3
-    2, // 4
+    1, // 4
     2, // 5
-    3, // 6
+    2, // 6
     3, // 7
-    4, // 8
+    3, // 8
     4  // 9
 };
 
@@ -307,7 +307,7 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
         const int pointing_angle_index = discretize(elrad2deg((*ref_el)[i]), 0, NUM_POINTING_ANGLES);
 
         /* get lookup table entry index */
-        const int wind_speed_lookup = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS);
+        const int wind_speed_lookup = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS, D_CEILING);
         const int kd_lookup = discretize((*kd)[i] * 100.0, 0, NUM_KDS, D_CEILING);
         int entry_index = (WIND_SPEED_INDEX[wind_speed_lookup] * 5) + KD_INDEX[kd_lookup];
         if(entry_index < 0 || entry_index >= NUM_TABLE_ENTRIES)
