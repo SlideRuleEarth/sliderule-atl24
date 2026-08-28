@@ -371,7 +371,7 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
 
         /* total uncertainties */
         double total_vertical_uncertainty = sqrt(pow((*sigma_h)[i], 2) + pow(transport_uncertainty, 2) + pow(signal_uncertainty, 2)); // [19]
-        const double total_horizontal_uncertainty = sqrt(pow((*sigma_across)[i], 2) + pow((*sigma_along)[i], 2) + pow(subaqueous_horizontal_uncertainty, 2));
+        const double total_horizontal_uncertainty = sqrt(pow((*sigma_across)[i], 2) + pow((*sigma_along)[i], 2) + pow(subaqueous_horizontal_uncertainty, 2)); // [23]
 
         /* bound total uncertainty */
         if(total_vertical_uncertainty < 0.1) total_vertical_uncertainty = 0.1;
