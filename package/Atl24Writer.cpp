@@ -468,7 +468,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
 
             /* Create Variable - surface_roughness */
             FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(df->getColumn("surface_roughness"));
-            add_variable(datasets, "surface_roughness", kd);
+            add_variable(datasets, "surface_roughness", surface_roughness);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
             add_attribute(datasets, "description", "Measure of wave heights and proxy for wind speed in uncertainty calculation");

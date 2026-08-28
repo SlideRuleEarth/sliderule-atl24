@@ -1,11 +1,14 @@
 import importlib
 import boto3
+from h5coro import h5coro, s3driver
 import sys
 import json
 import random
 import string
 import argparse
-from sliderule import sliderule
+import numpy as np
+import geopandas as gpd
+from sliderule import sliderule, icesat2
 
 try:
     tqdm = importlib.import_module("tqdm").tqdm
@@ -26,9 +29,10 @@ parser.add_argument('--batch_size', type=int,               default=10000)
 parser.add_argument('--script',     type=str,               default="utils/gen_atl24r3.lua")
 parser.add_argument('--database',   type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--vset',       type=str,               default="data/atl24r3_validation_set.txt")
-parser.add_argument('--verify',     type=str,               default=None) # name of run (e.g. vset_run2)
+parser.add_argument('--vrun',       type=str,               default=None) # name of validation run (e.g. vset_run2)
 parser.add_argument('--status',     action='store_true',    default=False)
 parser.add_argument('--report',     action='store_true',    default=False)
+parser.add_argument('--compare',    action='store_true',    default=False) # compare parquet with h5 file
 args = parser.parse_args()
 
 #########################################
@@ -54,9 +58,10 @@ args = parser.parse_args()
 #     },
 #     "granules": {
 #         "<ATL03 granule>": {
-#             "job": <name> ,-- of job responsible for processing granule
+#             "name": <job>, -- of job responsible for processing granule
 #             "status": <"pending", "empty", "output", "error">, -- pending: has not run yet, empty: ran and produced no output, output: completed with results, error: failed to complete
-#             "output": <url to output granule>, -- e.g. s3://sliderule-public/atl24_2026...parquet
+#             "rsps": <response from runner>,
+#             "duration": <seconds it took to complete>,
 #         }
 #     }
 # }
@@ -107,10 +112,10 @@ def submit_job(name, granules):
 #########################################
 # process granules for verification
 #########################################
-if args.verify:
+if args.vrun:
 
     # check argument
-    if not isinstance(args.verify, str) or len(args.verify) == 0:
+    if not isinstance(args.vrun, str) or len(args.vrun) == 0:
         print("Must supply name for the validation job")
         sys.exit(1)
 
@@ -120,7 +125,7 @@ if args.verify:
         granules = [line.strip() for line in lines if len(line) > 30]
 
     # submit job
-    submit_job(args.verify, granules)
+    submit_job(args.vrun, granules)
 
 #########################################
 # rerun granules that have failed
@@ -234,6 +239,112 @@ if args.report:
         except Exception as e:
             print(f"Unable to count {granule} with {data}: {e}")
     print(json.dumps(stats, indent=2))
+
+#########################################
+# compare parquet with h5 file
+#########################################
+VARIABLES = [
+    "class_ph",
+    "confidence",
+    "delta_time",
+    "ellipse_h",
+    "index_ph",
+    "index_seg",
+    "segment_id",
+    "lat_ph",
+    "lon_ph",
+    "night_flag",
+    "ortho_h",
+    "sigma_thu",
+    "sigma_tvu",
+    "surface_h",
+    "x_atc",
+    "y_atc",
+    "kd",
+    "surface_roughness"
+]
+
+BEAMS = [
+    "gt1l",
+    "gt1r",
+    "gt2l",
+    "gt2r",
+    "gt3l",
+    "gt3r"
+]
+
+GT_TO_BEAM = {
+    "gt1l": icesat2.GT1L,
+    "gt1r": icesat2.GT1R,
+    "gt2l": icesat2.GT2L,
+    "gt2r": icesat2.GT2R,
+    "gt3l": icesat2.GT3L,
+    "gt3r": icesat2.GT3R
+}
+
+datasets = [f'{beam}/{var}' for beam in BEAMS for var in VARIABLES]
+
+if args.compare:
+    for granule,data in database["granules"].items():
+        try:
+            # open h5 file
+            atl24_h5_file = f"sliderule-public/atl24r3/h5/{granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.h5")}"
+            print(f"H5coro opening {atl24_h5_file}")
+            h5obj = h5coro.H5Coro(atl24_h5_file, s3driver.S3Driver, errorChecking=True, verbose=False, credentials={"role": True, "role":"iam"}, multiProcess=False)
+            promise = h5obj.readDatasets(datasets, block=False, enableAttributes=False)
+
+            # open parquet file
+            atl24_parquet_file = f"s3://sliderule-public/atl24r3/parquet/{granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.parquet")}"
+            print(f"Geopandas opening {atl24_parquet_file}")
+            gdf = gpd.read_parquet(atl24_parquet_file)
+
+            # process each beam in the granule
+            for beam in BEAMS:
+
+                # check beam
+                if f'{beam}/{VARIABLES[0]}' not in promise:
+                    print(f"Beam {beam} skipped")
+                    continue
+
+                # build dataframes
+                h5_df = gpd.pd.DataFrame({var: promise[f'{beam}/{var}'][:] for var in VARIABLES})
+                parquet_df = gdf[gdf["gt"] == GT_TO_BEAM[beam]] # .reset_index(drop=True)
+
+                # check class_ph
+                allowed_classifications = [0, 1, 2, 40, 41]
+                if not h5_df["class_ph"].isin(allowed_classifications).all():
+                    raise RuntimeError(f'Error - {beam}/class_ph: unexpected classifications {set(h5_df["class_ph"]) - set(allowed_classifications)}')
+
+                # check values (compared positionally; the two frames have different indexes)
+                for var in VARIABLES:
+                    if var in ["delta_time", "lat_ph", "lon_ph", "night_flag", "ortho_h"]:
+                        continue
+                    if var in ["surface_roughness"]: ### REMOVE with rebuild when bug fixed
+                        continue
+                    h5_vals = h5_df[var].to_numpy()
+                    parquet_vals = parquet_df[var].to_numpy()
+                    if len(h5_vals) != len(parquet_vals):
+                        raise RuntimeError(f'Error - {beam}/{var}: mismatched length {len(h5_vals)} != {len(parquet_vals)}')
+                    if np.issubdtype(h5_vals.dtype, np.floating) or np.issubdtype(parquet_vals.dtype, np.floating):
+                        rtol = 1e-6 if np.float32 in (h5_vals.dtype, parquet_vals.dtype) else 1e-12
+                        diffs = ~np.isclose(h5_vals, parquet_vals, rtol=rtol, atol=0.0, equal_nan=True)
+                    else:
+                        diffs = (h5_vals != parquet_vals)
+                    if diffs.sum() > 0:
+                        max_diff = np.max(np.abs(h5_vals[diffs].astype(np.float64) - parquet_vals[diffs].astype(np.float64)))
+                        raise RuntimeError(f'Error - {beam}/{var}: {diffs.sum()} mismatched values in {len(parquet_vals)} rows, max diff {max_diff}')
+
+                # display progress
+                print(f"Beam {beam} processed")
+
+            # close granules
+            h5obj.close()
+
+            # success
+            print(f"{granule} - {len(gdf)} rows")
+
+        except Exception as e:
+            print(f"{granule} - exception: {e}")
 
 #########################################
 # save database
