@@ -1,5 +1,6 @@
 local runner = require("test_executive")
 local aws_utils = require("aws_utils")
+local _,dir = runner.srcscript()
 
 -- Configure Optional Tags
 local tags = {}
@@ -12,8 +13,8 @@ end
 aws_utils.config_aws()
 
 -- Execute Tests --
-runner.script("atl24_writer.lua")
-runner.script("atl24_uncertainty.lua")
+runner.script(dir .. "atl24_writer.lua")
+runner.script(dir .. "atl24_uncertainty.lua")
 
 -- Report Results --
 local errors = runner.report()
