@@ -38,7 +38,7 @@ prep:
 	mkdir -p $(BUILD)
 
 selftest: install
-	make -C $(SLIDERULE)/targets/slideruleearth run RUN_CMD=/home/jswinski/meta/sliderule-atl24/scripts/test_runner.lua
+	make -C $(SLIDERULE)/targets/slideruleearth run RUN_CMD=/home/jswinski/meta/sliderule-atl24/selftests/test_runner.lua
 
 tag:
 	echo $(VERSION) > $(ROOT)/version.txt

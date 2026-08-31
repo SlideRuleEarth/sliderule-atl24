@@ -275,7 +275,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_variable(datasets, "class_ph", class_ph);
             add_attribute(datasets, "contentType", "modelResults");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
-            add_attribute(datasets, "description", "0 - unclassified, 1 - other, 40 - bathymetry, 41 - sea surface");
+            add_attribute(datasets, "description", "0 - unclassified, 1 - other, 2 - ground, 40 - bathymetry, 41 - sea surface");
             add_attribute(datasets, "long_name", "Photon classification");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "scalar");
@@ -806,6 +806,28 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         add_attribute(datasets, "source", "POD/PPD");
         add_attribute(datasets, "units", "seconds since 2018-01-01");
         add_attribute(datasets, "standard_name", "time");
+        goto_parent(datasets);
+
+        /* Create Variable - bounding_polygon_lat1 */
+        add_scalar(datasets, "bounding_polygon_lat1", &granule["lat_poly"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "Latitude values for the first out of two possible bounding polygons");
+        add_attribute(datasets, "long_name", "Polygon1 Latitude");
+        add_attribute(datasets, "source", "geo_poly");
+        add_attribute(datasets, "units", "degrees_north");
+        add_attribute_double(datasets, "valid_max", 90.0);
+        add_attribute_double(datasets, "valid_min", -90.0);
+        goto_parent(datasets);
+
+        /* Create Variable - bounding_polygon_lon1 */
+        add_scalar(datasets, "bounding_polygon_lon1", &granule["lon_poly"]);
+        add_attribute(datasets, "contentType", "referenceInformation");
+        add_attribute(datasets, "description", "Longitude values for the first out of two possible bounding polygons");
+        add_attribute(datasets, "long_name", "Polygon1 Longitude");
+        add_attribute(datasets, "source", "geo_poly");
+        add_attribute(datasets, "units", "degrees_east");
+        add_attribute_double(datasets, "valid_max", 180.0);
+        add_attribute_double(datasets, "valid_min", -180.0);
         goto_parent(datasets);
 
         /* Go Back to Parent Group */

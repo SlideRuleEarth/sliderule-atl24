@@ -1,5 +1,4 @@
 local runner = require("test_executive")
-local pp = require("prettyprint")
 local csv = require("csv")
 
 -- Local --

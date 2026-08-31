@@ -1,11 +1,11 @@
 -- initialization
-local json          = require("json")
-local aws_utils     = require("aws_utils")
-local _, build      = sys.version()
-local release       = "3"
-local timeout       = 5400 * 1000
-local result        = { status = true, build = build, start = time.latch(), messages = {} }
-local consoleq      = msg.subscribe("consoleq") -- prevents error posting to consoleq
+local json                  = require("json")
+local aws_utils             = require("aws_utils")
+local version, _, build, _  = sys.version()
+local release               = "3"
+local timeout               = 5400 * 1000
+local result                = { status = true, build = build, start = time.latch(), messages = {} }
+local consoleq              = msg.subscribe("consoleq") -- prevents error posting to consoleq
 
 repeat
 
@@ -29,6 +29,7 @@ repeat
     -- output files
     local parquet_output_file = resource:gsub("ATL03", string.format("atl24r%s/parquet/ATL24", release)):gsub("%.h5", string.format("_00%s_01.parquet", release))
     local h5_output_file = resource:gsub("ATL03", string.format("atl24r%s/h5/ATL24", release)):gsub("%.h5", string.format("_00%s_01.h5", release))
+    local xml_output_file = resource:gsub("ATL03", string.format("atl24r%s/xml/ATL24", release)):gsub("%.h5", string.format("_00%s_01.iso.xml", release))
 
     -- request structure
     local rqst = {
@@ -129,6 +130,13 @@ repeat
         break
     end
 
+    -- wait for granule to finish being read
+    if not granule:waiton(timeout) then
+        table.insert(result["messages"], "failed to read ATL03 granule")
+        result["status"] = false
+        break
+    end
+
     -- write dataframes to h5 file
     local tmp_filename = string.format("/tmp/%s", resource:gsub("ATL03", "TMP"):gsub("%.h5", ".bin"))
     local atl24_file = atl24.writer(parms, dataframes, granule, release)
@@ -143,6 +151,64 @@ repeat
     local h5_status = core.send2user(tmp_filename, "consoleq", parms, h5_output_file)
     if not h5_status then
         table.insert(result["messages"], "failed to send h5 file")
+        result["status"] = false
+        break
+    end
+
+    -- read xml template file
+    local xml_template = io.open(__confdir.."/template.xml", "r")
+    if not xml_template then
+        table.insert(result["message"], "failed to open xml template")
+        result["status"] = false
+        break
+    end
+    local xml_content = xml_template:read("*a")
+    xml_template:close()
+
+    -- build polygon string
+    local info = granule:export()
+    local lat_poly = info["lat_poly"]
+    local lon_poly = info["lon_poly"]
+    if not lat_poly or not lon_poly or #lat_poly ~= #lon_poly then
+        table.insert(result["message"], "invalid latitude and longitude arrays")
+        result["status"] = false
+        break
+    end
+    local poly_list = {}
+    for i=1,#lat_poly do
+        table.insert(poly_list, string.format("%.15f", lon_poly[i]))
+        table.insert(poly_list, string.format("%.15f", lat_poly[i]))
+    end
+    local poly_str = table.concat(poly_list, " ")
+
+    -- populate content of xml file
+    local now = time.gps()
+    local year, month, day, hour, minute, second, _ = time.gps2date(now)
+    local atl24_granule = resource:gsub("ATL03", "ATL24"):gsub("%.h5", string.format("_00%s_01.h5", release))
+    xml_content = xml_content:gsub("$GENERATION_DATE", string.format("\"%04d-%02d-%02dT%02d:%02d:%02dZ\"", year, month, day, hour, minute, second))
+    xml_content = xml_content:gsub("$SLIDERULE_VERSION", version)
+    xml_content = xml_content:gsub("$DATA_START_UTC", string.format("%s", info["data_start_utc"]))
+    xml_content = xml_content:gsub("$DATA_END_UTC", string.format("%s", info["data_end_utc"]))
+    xml_content = xml_content:gsub("$POLY_STR", poly_str) -- lon lat lon lat ...
+    xml_content = xml_content:gsub("$GRANULE_RELEASE", string.format("00%s", release)) -- e.g. 003
+    xml_content = xml_content:gsub("$GRANULE_NAME", atl24_granule) -- ATL24...h5
+    xml_content = xml_content:gsub("$GRANULE_VERSION", "001") -- e.g. 001
+
+    -- write populated template to xml file
+    local xml_filename = string.format("/tmp/%s", resource:gsub("%.h5", ".iso.xml"))
+    local xml_file = io.open(xml_filename, "w")
+    if not xml_file then
+        table.insert(result["messages"], "failed to open xml file")
+        result["status"] = false
+        break
+    end
+    xml_file:write(xml_content)
+    xml_file:close()
+
+    -- send xml file to s3
+    local xml_status = core.send2user(xml_filename, "consoleq", parms, xml_output_file)
+    if not xml_status then
+        table.insert(result["messages"], "failed to send xml file")
         result["status"] = false
         break
     end

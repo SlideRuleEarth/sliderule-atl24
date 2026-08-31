@@ -289,13 +289,11 @@ if args.compare:
         try:
             # open h5 file
             atl24_h5_file = f"sliderule-public/atl24r3/h5/{granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.h5")}"
-            print(f"H5coro opening {atl24_h5_file}")
             h5obj = h5coro.H5Coro(atl24_h5_file, s3driver.S3Driver, errorChecking=True, verbose=False, credentials={"role": True, "role":"iam"}, multiProcess=False)
             promise = h5obj.readDatasets(datasets, block=False, enableAttributes=False)
 
             # open parquet file
             atl24_parquet_file = f"s3://sliderule-public/atl24r3/parquet/{granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.parquet")}"
-            print(f"Geopandas opening {atl24_parquet_file}")
             gdf = gpd.read_parquet(atl24_parquet_file)
 
             # process each beam in the granule
@@ -310,6 +308,13 @@ if args.compare:
                 h5_df = gpd.pd.DataFrame({var: promise[f'{beam}/{var}'][:] for var in VARIABLES})
                 parquet_df = gdf[gdf["gt"] == GT_TO_BEAM[beam]] # .reset_index(drop=True)
 
+                # create lat and lon columns
+                parquet_df["lat_ph"] = parquet_df.geometry.y
+                parquet_df["lon_ph"] = parquet_df.geometry.x
+                parquet_df["ortho_h"] = parquet_df["geoid_corr_h"]
+                parquet_df["delta_time"] = (parquet_df.index - np.datetime64('2018-01-01T00:00:00')) / np.timedelta64(1, 's')
+                parquet_df["night_flag"] = ((parquet_df["processing_flags"] & 0x20) != 0).astype(np.int8)
+
                 # check class_ph
                 allowed_classifications = [0, 1, 2, 40, 41]
                 if not h5_df["class_ph"].isin(allowed_classifications).all():
@@ -317,10 +322,6 @@ if args.compare:
 
                 # check values (compared positionally; the two frames have different indexes)
                 for var in VARIABLES:
-                    if var in ["delta_time", "lat_ph", "lon_ph", "night_flag", "ortho_h"]:
-                        continue
-                    if var in ["surface_roughness"]: ### REMOVE with rebuild when bug fixed
-                        continue
                     h5_vals = h5_df[var].to_numpy()
                     parquet_vals = parquet_df[var].to_numpy()
                     if len(h5_vals) != len(parquet_vals):
@@ -334,14 +335,11 @@ if args.compare:
                         max_diff = np.max(np.abs(h5_vals[diffs].astype(np.float64) - parquet_vals[diffs].astype(np.float64)))
                         raise RuntimeError(f'Error - {beam}/{var}: {diffs.sum()} mismatched values in {len(parquet_vals)} rows, max diff {max_diff}')
 
-                # display progress
-                print(f"Beam {beam} processed")
-
             # close granules
             h5obj.close()
 
             # success
-            print(f"{granule} - {len(gdf)} rows")
+            print(f"{granule} - successfully checked {len(gdf)} rows")
 
         except Exception as e:
             print(f"{granule} - exception: {e}")

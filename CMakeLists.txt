@@ -82,6 +82,7 @@ install (
 install (
     FILES
         ${ATL24DIR}/models/atl24.tgz
+        ${CMAKE_CURRENT_LIST_DIR}/package/template.xml
         ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_0_deg.csv
         ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_1_deg.csv
         ${CMAKE_CURRENT_LIST_DIR}/tables/SNR_ATLAS_2_deg.csv

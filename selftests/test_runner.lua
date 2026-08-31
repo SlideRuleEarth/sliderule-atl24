@@ -15,6 +15,7 @@ aws_utils.config_aws()
 -- Execute Tests --
 runner.script(dir .. "atl24_writer.lua")
 runner.script(dir .. "atl24_uncertainty.lua")
+runner.script(dir .. "atl24_granule.lua")
 
 -- Report Results --
 local errors = runner.report()
