@@ -53,10 +53,11 @@ PluginFields::PluginFields(void):
         {"plugin_build",            &pluginBuild},
         {"plugin_algoinfo",         &pluginAlgorithm}
     }),
-    slideruleVersion(SystemConfig::getLibraryVersion()),
-    slideruleBuild(SystemConfig::getBuildInformation()),
-    pluginVersion(BINID),
-    pluginBuild(BUILDINFO),
-    pluginAlgorithm(ALGOINFO)
+    slideruleVersion(SystemConfig::getLibraryVersion(), Field::READ_ONLY),
+    slideruleBuild(SystemConfig::getBuildInformation(), Field::READ_ONLY),
+    slideruleEnvironment(SystemConfig::settings().environmentVersion.value, Field::READ_ONLY),
+    pluginVersion(BINID, Field::READ_ONLY),
+    pluginBuild(BUILDINFO, Field::READ_ONLY),
+    pluginAlgorithm(ALGOINFO, Field::READ_ONLY)
 {
 }
