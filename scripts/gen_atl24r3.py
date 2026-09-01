@@ -26,7 +26,7 @@ parser.add_argument('--rerun',      type=str,               default=None) # name
 parser.add_argument('--vcpus',      type=int,               default=4)
 parser.add_argument('--memory',     type=int,               default=16000)
 parser.add_argument('--batch_size', type=int,               default=10000)
-parser.add_argument('--script',     type=str,               default="utils/gen_atl24r3.lua")
+parser.add_argument('--script',     type=str,               default="scripts/gen_atl24r3.lua")
 parser.add_argument('--database',   type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--vset',       type=str,               default="data/atl24r3_validation_set.txt")
 parser.add_argument('--vrun',       type=str,               default=None) # name of validation run (e.g. vset_run2)
