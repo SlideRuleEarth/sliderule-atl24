@@ -123,14 +123,4 @@ def build_validation_set():
 # Main
 # ###############################
 
-if False:
-    # get parquet granules
-    bucket, subfolder = parse_url(args.source_parquets)
-    parquet_granules = list_bucket(bucket, subfolder)
-    for granule in parquet_granules:
-        key = f"{subfolder}/{granule}"
-        attrs = get_attributes(bucket, key)
-        display(f"{granule} - {attrs["size"]} - {attrs["sha256"]}\n")
-
-if args.build_validation_set:
-    build_validation_set()
+build_validation_set()

@@ -809,7 +809,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         goto_parent(datasets);
 
         /* Create Variable - bounding_polygon_lat1 */
-        add_scalar(datasets, "bounding_polygon_lat1", &granule["lat_poly"]);
+        add_variable(datasets, "bounding_polygon_lat1", &granule["lat_poly"]);
         add_attribute(datasets, "contentType", "referenceInformation");
         add_attribute(datasets, "description", "Latitude values for the first out of two possible bounding polygons");
         add_attribute(datasets, "long_name", "Polygon1 Latitude");
@@ -820,7 +820,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
         goto_parent(datasets);
 
         /* Create Variable - bounding_polygon_lon1 */
-        add_scalar(datasets, "bounding_polygon_lon1", &granule["lon_poly"]);
+        add_variable(datasets, "bounding_polygon_lon1", &granule["lon_poly"]);
         add_attribute(datasets, "contentType", "referenceInformation");
         add_attribute(datasets, "description", "Longitude values for the first out of two possible bounding polygons");
         add_attribute(datasets, "long_name", "Polygon1 Longitude");
