@@ -13,7 +13,7 @@ from sliderule import icesat2
 parser = argparse.ArgumentParser(description="""ATL24""")
 parser.add_argument('--database',       type=str,   default="data/atl24r3_database.json")
 parser.add_argument('--atl03_granule',  type=str,   default=None) # "ATL03_20191215112656_12150507_006_01.h5"
-args,_ = parser.parse_known_args()
+args = parser.parse_args()
 
 #
 # Read Database
