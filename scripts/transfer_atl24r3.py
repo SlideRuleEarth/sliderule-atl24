@@ -91,7 +91,6 @@ def get_attributes(filename):
 # Main
 # ###############################
 
-
 try:
     # Get granules to transfer
     for granule, entry in database.granules.items():

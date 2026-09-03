@@ -6,6 +6,7 @@ import geopandas as gpd
 import numpy as np
 from h5coro import h5coro, s3driver
 from sliderule import icesat2
+from atl24r3_database import Database, Status
 
 #
 # Command Line Arguments
@@ -19,8 +20,7 @@ args = parser.parse_args()
 # Read Database
 #
 print(f"Reading database {args.database} ...")
-with open(args.database, "r") as file:
-    database = json.load(file)
+database = Database(args.database)
 
 #
 # Authenticate with Earth Access
@@ -394,6 +394,9 @@ def analyze_atl24_result(atl03_granule):
 # Main
 #
 if __name__ == "__main__":
-    atl03_granules = args.atl03_granule and [args.atl03_granule] or database["granules"]
+    atl03_granules = args.atl03_granule and [args.atl03_granule] or database.granules
     for atl03_granule in atl03_granules:
-        analyze_atl24_result(atl03_granule)
+        if database.granules[atl03_granule]["status"] in [Status.PENDING, Status.EMPTY, Status.ERROR]:
+            print(f"*** {atl03_granule} - skipped analysis due to status: {database.granules[atl03_granule]["status"]}")
+        else:
+            analyze_atl24_result(atl03_granule)
