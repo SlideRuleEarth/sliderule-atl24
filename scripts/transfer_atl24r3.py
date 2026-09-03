@@ -19,7 +19,8 @@ parser.add_argument('--source',                 type=str,               default=
 parser.add_argument('--database',               type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--data_version',           type=str,               default="003")
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
-parser.add_argument('--batch_size',             type=int,               default=100)
+parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
+parser.add_argument('--granules_to_transfer',   type=str,               default="output")
 parser.add_argument('--test',                   action='store_true',    default=False)
 parser.add_argument('--verbose',                action='store_true',    default=False)
 args = parser.parse_args()
@@ -39,17 +40,6 @@ else:
 
 # create s3 client
 s3 = boto3.client("s3")
-
-# Get kinesis client by assuming the role and getting credentials
-sts = boto3.client('sts')
-assumed_role = sts.assume_role(RoleArn=assume_role, RoleSessionName='AssumeRoleSession')
-credentials = assumed_role['Credentials'] # get temporary credentials
-kinesis = boto3.client(
-    'kinesis',
-    region_name='us-west-2',
-    aws_access_key_id=credentials['AccessKeyId'],
-    aws_secret_access_key=credentials['SecretAccessKey'],
-    aws_session_token=credentials['SessionToken'])
 
 # read database
 with open(args.database, "r") as file:
@@ -81,7 +71,9 @@ def calc_checksum(bucket, key):
     return sha256.hexdigest()
 
 # Get Size and SHA256 Checksum of S3 Object
-def get_attributes(bucket, key):
+def get_attributes(filename):
+    bucket, subfolder = parse_url(args.source)
+    key = f"{subfolder}/{filename}"
     response = s3.head_object(Bucket=bucket, Key=key, ChecksumMode="ENABLED")
     checksum = response.get("ChecksumSHA256")
     if checksum and "-" not in checksum: # "-N" suffix is a composite (per-part) checksum, not the whole-object digest
@@ -89,98 +81,137 @@ def get_attributes(bucket, key):
     else:
         checksum = calc_checksum(bucket, key)
     return {
+        "name": filename,
+        "path": f"{args.source}/{filename}",
         "size": response["ContentLength"],
         "checksum": checksum
     }
+
+# Update granule status in database
+def database_status_update(granule, status):
+    database["granules"][granule]["status"] = status
+
+# Update granule attributes in database
+def database_attributes_update(granule, attrs):
+    database["granules"][granule]["attributes"] = attrs
+    database_status_update(granule, "tx_ready")
 
 # ###############################
 # Main
 # ###############################
 
-# get granules to transfer
-granules_to_transfer = {}
-bucket, subfolder = parse_url(args.source)
-for atl03_granule, entry in database["granules"].items():
-    if entry["status"] == "output":
-        granule = atl03_granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
-        granules_to_transfer[granule] = {
-            "h5": get_attributes(bucket, f"{subfolder}/{granule}.h5"),
-            "xml": get_attributes(bucket, f"{subfolder}/{granule}.iso.xml")
-        }
+try:
+    # Get granules to transfer
+    for granule, entry in database["granules"].items():
+        if entry["status"] == args.granules_to_transfer:
+            atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
+            try:
+                database_attributes_update(granule, {
+                    "h5": get_attributes(f"{atl24_granule}.h5"),
+                    "xml": get_attributes(f"{atl24_granule}.iso.xml")
+                })
+            except Exception as e:
+                print(f"Error! Missing output for {granule}")
+                database_status_update(granule, "missing")
 
-# Metrics
-records_to_transfer = min(len(granules_to_transfer), args.transfer)
-records_success = 0
-records_failure = 0
+    # Initialize loop variables
+    granules_to_transfer = [granule for granule in database["granules"] if database["granules"][granule]["status"] == "tx_ready"]
+    num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
+    records_success = 0
+    records_failure = 0
+    previous_cred_refresh = 0.0 # previous time
 
-# Post records to stream
-for i in range(0, records_to_transfer, args.batch_size):
+    # Post records to stream
+    for i in range(0, num_granules_to_transfer, args.batch_size):
 
-    # Verbose status
-    if args.verbose:
-        print(f"Posting granules {i} to {i + args.batch_size} of {records_to_transfer}")
+        # Get kinesis client by assuming the role and getting credentials
+        now = time.time()
+        if (now - previous_cred_refresh) > (60 * 30): # 30 minutes
+            print(f"Refreshing credentials for {assume_role}")
+            previous_cred_refresh = now
+            sts = boto3.client('sts')
+            assumed_role = sts.assume_role(RoleArn=assume_role, RoleSessionName='AssumeRoleSession')
+            credentials = assumed_role['Credentials'] # get temporary credentials
+            kinesis = boto3.client(
+                'kinesis',
+                region_name='us-west-2',
+                aws_access_key_id=credentials['AccessKeyId'],
+                aws_secret_access_key=credentials['SecretAccessKey'],
+                aws_session_token=credentials['SessionToken'])
 
-    # Build batch of records
-    batch = [{
-        "Data": json.dumps({
-            "version": 1.3,
-            "submissionTime": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000000"),
-            "identifier": str(uuid.uuid4()),
-            "collection": collection,
-            "provider": provider,
-            "responseStreamArn": response_stream_arn,
-            "product": {
-                "name": f"{granule}.h5",
-                "dataVersion": args.data_version,
-                "files": [
-                    {
-                        "name": f"{granule}.iso.xml",
-                        "type": "metadata",
-                        "uri": f"{args.source}/{granule}.iso.xml",
-                        "checksumType": "SHA256",
-                        "checksum": granules_to_transfer[granule]["xml"]["checksum"],
-                        "size": granules_to_transfer[granule]["xml"]["size"],
-                    },
-                    {
-                        "name": f"{granule}.h5",
-                        "type": "data",
-                        "uri": f"{args.source}/{granule}.h5",
-                        "checksumType": "SHA256",
-                        "checksum": granules_to_transfer[granule]["h5"]["checksum"],
-                        "size": granules_to_transfer[granule]["h5"]["size"],
-                    }
-                ]
-            }
-        }),
-        "PartitionKey": partition_key
-    } for granule in granules_to_transfer[i:i+args.batch_size]]
+        # Verbose status
+        if args.verbose:
+            print(f"Posting granules {i} to {i + args.batch_size} of {num_granules_to_transfer}")
 
-    # Post batch of records
-    backoff_performed = False
-    batch_response = kinesis.put_records(StreamName=notification_stream, Records=batch)
-    for record, result in zip(batch, batch_response["Records"]):
-        if "ErrorCode" in result:   # e.g. ProvisionedThroughputExceededException
-            # Perform backoff
-            if not backoff_performed:
-                backoff_performed = True
-                time.sleep(5)
-            # Retry post
-            individual_response = kinesis.put_record(StreamName=notification_stream, Data=record["Data"], PartitionKey=partition_key)
-            if individual_response['ResponseMetadata']['HTTPStatusCode'] != 200:
-                if not args.test: database["granules"][granule]["status"] = "tx_failed" # update database
-                records_failure += 1
+        # Build batch of records
+        batch = [{
+            "Data": json.dumps({
+                "version": 1.3,
+                "submissionTime": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000000"),
+                "identifier": str(uuid.uuid4()),
+                "collection": collection,
+                "provider": provider,
+                "responseStreamArn": response_stream_arn,
+                "product": {
+                    "name": database["granules"][granule]["attributes"]["h5"]["name"],
+                    "dataVersion": args.data_version,
+                    "files": [
+                        {
+                            "name": database["granules"][granule]["attributes"]["xml"]["name"],
+                            "type": "metadata",
+                            "uri": database["granules"][granule]["attributes"]["xml"]["path"],
+                            "checksumType": "SHA256",
+                            "checksum": database["granules"][granule]["attributes"]["xml"]["checksum"],
+                            "size": database["granules"][granule]["attributes"]["xml"]["size"],
+                        },
+                        {
+                            "name": database["granules"][granule]["attributes"]["h5"]["name"],
+                            "type": "data",
+                            "uri": database["granules"][granule]["attributes"]["h5"]["path"],
+                            "checksumType": "SHA256",
+                            "checksum": database["granules"][granule]["attributes"]["h5"]["checksum"],
+                            "size": database["granules"][granule]["attributes"]["h5"]["size"],
+                        }
+                    ]
+                }
+            }),
+            "PartitionKey": granule
+        } for granule in granules_to_transfer[i:min(i+args.batch_size, num_granules_to_transfer)]]
+
+        # Post batch of records
+        backoff_performed = False
+        batch_response = kinesis.put_records(StreamName=notification_stream, Records=batch)
+        for record, result, k in zip(batch, batch_response["Records"], range(len(batch))):
+            granule = granules_to_transfer[i + k]
+            if "ErrorCode" in result:   # e.g. ProvisionedThroughputExceededException
+                # Perform backoff
+                if not backoff_performed:
+                    backoff_performed = True
+                    time.sleep(5)
+                # Retry post
+                try:
+                    individual_response = kinesis.put_record(StreamName=notification_stream, Data=record["Data"], PartitionKey=granule)
+                    database_status_update(granule, "tx_initiated")
+                    records_success += 1
+                except Exception as e:
+                    database_status_update(granule, "tx_failed")
+                    print(f"Error! Failed to put granule {atl24_granule}: {e}")
+                    records_failure += 1
             else:
-                if not args.test: database["granules"][granule]["status"] = "tx_initiated" # update database
+                database_status_update(granule, "tx_initiated")
                 records_success += 1
-        else:
-            if not args.test: database["granules"][granule]["status"] = "tx_initiated" # update database
-            records_success += 1
 
-    # Status
-    print(f"Finished transfering {records_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
+    # Status Success
+    print(f"Finished transfering {num_granules_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
+
+except Exception as e:
+
+    # Status Failure
+    print(f"Error! Unhandled exception: {e}")
 
 #########################################
 # save database
 #########################################
-with open(args.database, 'w') as file:
-    json.dump(database, file)
+if not args.test:
+    with open(args.database, 'w') as file:
+        json.dump(database, file)
