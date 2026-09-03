@@ -93,22 +93,30 @@ def get_attributes(filename):
 
 try:
     # Get granules to transfer
-    for granule, entry in database.granules.items():
-        if entry["status"] == args.status_to_transfer:
-            atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
-            try:
-                database.update_attributes(granule, {
-                    "h5": get_attributes(f"{atl24_granule}.h5"),
-                    "xml": get_attributes(f"{atl24_granule}.iso.xml")
-                })
-            except Exception as e:
-                print(f"Error! Missing output for {granule}: {e}")
-                database.update_status(granule, Status.MISSING)
+    granules_to_check = [granule for granule, entry in database.granules.items() if entry["status"] == args.status_to_transfer]
+    print(f"Preparing {len(granules_to_check)} granules with status {args.status_to_transfer}")
+    for i in range(len(granules_to_check)):
+        granule = granules_to_check[i]
+        atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
+        if i % 10 == 0:
+            sys.stdout.write(".")
+            sys.stdout.flush()
+        try:
+            database.update_attributes(granule, {
+                "h5": get_attributes(f"{atl24_granule}.h5"),
+                "xml": get_attributes(f"{atl24_granule}.iso.xml")
+            })
+        except Exception as e:
+            print(f"Error! Missing output for {granule}: {e}")
+            database.update_status(granule, Status.MISSING)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
     # Initialize loop variables
     granules_to_transfer = [granule for granule, entry in database.granules.items() if entry["status"] == Status.TX_READY]
     num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
     previous_cred_refresh = 0.0 # previous time
+    print(f"Transfering {num_granules_to_transfer} of {len(granules_to_transfer)} granules ready to be transferred")
 
     # Post records to stream
     for i in range(0, num_granules_to_transfer, args.batch_size):
