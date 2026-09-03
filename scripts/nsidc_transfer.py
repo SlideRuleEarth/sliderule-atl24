@@ -209,4 +209,3 @@ for granule in granules_to_transfer:
     else:
         print(f"Finished transfering {records_transfered} of {records_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
         sys.exit(0)
-

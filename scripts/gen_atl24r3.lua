@@ -31,6 +31,11 @@ repeat
     local h5_output_file = resource:gsub("ATL03", string.format("atl24r%s/h5/ATL24", release)):gsub("%.h5", string.format("_00%s_01.h5", release))
     local xml_output_file = resource:gsub("ATL03", string.format("atl24r%s/xml/ATL24", release)):gsub("%.h5", string.format("_00%s_01.iso.xml", release))
 
+    -- save outputs
+    result["parquet"] = parquet_output_file
+    result["h5"] = h5_output_file
+    result["xml"] = xml_output_file
+
     -- request structure
     local rqst = {
         ["output"] = {
