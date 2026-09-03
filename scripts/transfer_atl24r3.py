@@ -1,13 +1,14 @@
 import argparse
 import base64
+import os
 import sys
-from contextlib import suppress
+import traceback
 import boto3
 import hashlib
 import json
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ###############################
 # Globals
@@ -45,14 +46,12 @@ s3 = boto3.client("s3")
 with open(args.database, "r") as file:
     database = json.load(file)
 
+# program status
+exit_code = 0
+
 # ###############################
 # Helper Functions
 # ###############################
-
-# Display Raw
-def display(s):
-    sys.stdout.write(s)
-    sys.stdout.flush()
 
 # Parse URL into Bucket and Subfolder
 def parse_url(url):
@@ -147,7 +146,7 @@ try:
         batch = [{
             "Data": json.dumps({
                 "version": 1.3,
-                "submissionTime": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000000"),
+                "submissionTime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000000"),
                 "identifier": str(uuid.uuid4()),
                 "collection": collection,
                 "provider": provider,
@@ -204,14 +203,19 @@ try:
     # Status Success
     print(f"Finished transfering {num_granules_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
 
-except Exception as e:
+except Exception:
 
     # Status Failure
-    print(f"Error! Unhandled exception: {e}")
+    print(f"Error! Unhandled exception:\n{traceback.format_exc()}")
+    exit_code = 1
 
-#########################################
-# save database
-#########################################
-if not args.test:
-    with open(args.database, 'w') as file:
-        json.dump(database, file)
+finally:
+
+    # Save Database - written via a temporary file so that an interrupt cannot truncate the database
+    if not args.test:
+        tmp_database = f"{args.database}.tmp"
+        with open(tmp_database, 'w') as file:
+            json.dump(database, file, indent=2)
+        os.replace(tmp_database, args.database)
+
+sys.exit(exit_code)
