@@ -22,6 +22,7 @@ parser.add_argument('--data_version',           type=str,               default=
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
 parser.add_argument('--status_to_transfer',     type=Status,            default=Status.OUTPUT)
+parser.add_argument('--throttle',               type=float,             default=0.1) # seconds
 parser.add_argument('--atl24_granule',          type=str,               default=None) # ATL24_20181014002954_02350105_007_01_003_01.h5
 parser.add_argument('--test',                   action='store_true',    default=False)
 parser.add_argument('--verbose',                action='store_true',    default=False)
@@ -186,17 +187,13 @@ try:
         } for granule in granules_to_transfer[i:min(i+args.batch_size, num_granules_to_transfer)]]
 
         # Post batch of records
-        backoff_performed = False
         batch_response = kinesis.put_records(StreamName=notification_stream, Records=batch)
         for record, result, k in zip(batch, batch_response["Records"], range(len(batch))):
             granule = granules_to_transfer[i + k]
             if "ErrorCode" in result:   # e.g. ProvisionedThroughputExceededException
-                # Perform backoff
-                if not backoff_performed:
-                    backoff_performed = True
-                    time.sleep(5)
                 # Retry post
                 try:
+                    time.sleep(args.throttle)
                     individual_response = kinesis.put_record(StreamName=notification_stream, Data=record["Data"], PartitionKey=granule)
                     database.update_status(granule, Status.TX_INITIATED)
                     records_success += 1
