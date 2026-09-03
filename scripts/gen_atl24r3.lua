@@ -190,14 +190,13 @@ repeat
     local now = time.gps()
     local year, month, day, hour, minute, second, _ = time.gps2date(now)
     local atl24_granule = resource:gsub("ATL03", "ATL24"):gsub("%.h5", string.format("_00%s_01.h5", release))
-    xml_content = xml_content:gsub("$GENERATION_DATE", string.format("\"%04d-%02d-%02dT%02d:%02d:%02dZ\"", year, month, day, hour, minute, second))
+    xml_content = xml_content:gsub("$GENERATION_DATE", string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", year, month, day, hour, minute, second))
     xml_content = xml_content:gsub("$SLIDERULE_VERSION", version)
     xml_content = xml_content:gsub("$DATA_START_UTC", string.format("%s", info["data_start_utc"]))
     xml_content = xml_content:gsub("$DATA_END_UTC", string.format("%s", info["data_end_utc"]))
     xml_content = xml_content:gsub("$POLY_STR", poly_str) -- lon lat lon lat ...
     xml_content = xml_content:gsub("$GRANULE_RELEASE", string.format("00%s", release)) -- e.g. 003
     xml_content = xml_content:gsub("$GRANULE_NAME", atl24_granule) -- ATL24...h5
-    xml_content = xml_content:gsub("$GRANULE_VERSION", "001") -- e.g. 001
 
     -- write populated template to xml file
     local xml_filename = string.format("/tmp/%s", resource:gsub("%.h5", ".iso.xml"))

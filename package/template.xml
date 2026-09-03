@@ -74,7 +74,7 @@
                   <gmd:identifier>
                     <gmd:MD_Identifier>
                       <gmd:code>
-                        <gco:CharacterString>$GRANULE_VERSION</gco:CharacterString>
+                        <gco:CharacterString>$GRANULE_RELEASE</gco:CharacterString>
                       </gmd:code>
                       <gmd:description>
                         <gco:CharacterString>The ECS Version ID</gco:CharacterString>
