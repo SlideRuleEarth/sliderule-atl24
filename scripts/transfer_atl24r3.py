@@ -1,6 +1,5 @@
 import argparse
 import base64
-import os
 import sys
 import traceback
 import boto3
@@ -9,6 +8,7 @@ import json
 import uuid
 import time
 from datetime import datetime, timezone
+from atl24r3_database import Database, Status
 
 # ###############################
 # Globals
@@ -21,7 +21,7 @@ parser.add_argument('--database',               type=str,               default=
 parser.add_argument('--data_version',           type=str,               default="003")
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
-parser.add_argument('--status_to_transfer',     type=str,               default="output")
+parser.add_argument('--status_to_transfer',     type=Status,            default=Status.OUTPUT)
 parser.add_argument('--test',                   action='store_true',    default=False)
 parser.add_argument('--verbose',                action='store_true',    default=False)
 args = parser.parse_args()
@@ -42,8 +42,7 @@ else:
 s3 = boto3.client("s3")
 
 # read database
-with open(args.database, "r") as file:
-    database = json.load(file)
+database = Database(args.database)
 
 # program status
 exit_code = 0
@@ -88,15 +87,6 @@ def get_attributes(filename):
         "checksum": checksum
     }
 
-# Update granule status in database
-def database_status_update(granule, status):
-    database["granules"][granule]["status"] = status
-
-# Update granule attributes in database
-def database_attributes_update(granule, attrs):
-    database["granules"][granule]["attributes"] = attrs
-    database_status_update(granule, "tx_ready")
-
 # ###############################
 # Main
 # ###############################
@@ -104,20 +94,20 @@ def database_attributes_update(granule, attrs):
 
 try:
     # Get granules to transfer
-    for granule, entry in database["granules"].items():
+    for granule, entry in database.granules.items():
         if entry["status"] == args.status_to_transfer:
             atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
             try:
-                database_attributes_update(granule, {
+                database.update_attributes(granule, {
                     "h5": get_attributes(f"{atl24_granule}.h5"),
                     "xml": get_attributes(f"{atl24_granule}.iso.xml")
                 })
             except Exception as e:
                 print(f"Error! Missing output for {granule}: {e}")
-                database_status_update(granule, "missing")
+                database.update_status(granule, Status.MISSING)
 
     # Initialize loop variables
-    granules_to_transfer = [granule for granule in database["granules"] if database["granules"][granule]["status"] == "tx_ready"]
+    granules_to_transfer = [granule for granule, entry in database.granules.items() if entry["status"] == Status.TX_READY]
     num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
     previous_cred_refresh = 0.0 # previous time
 
@@ -153,24 +143,24 @@ try:
                 "provider": provider,
                 "responseStreamArn": response_stream_arn,
                 "product": {
-                    "name": database["granules"][granule]["attributes"]["h5"]["name"],
+                    "name": database.granules[granule]["attributes"]["h5"]["name"],
                     "dataVersion": args.data_version,
                     "files": [
                         {
-                            "name": database["granules"][granule]["attributes"]["xml"]["name"],
+                            "name": database.granules[granule]["attributes"]["xml"]["name"],
                             "type": "metadata",
-                            "uri": database["granules"][granule]["attributes"]["xml"]["path"],
+                            "uri": database.granules[granule]["attributes"]["xml"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": database["granules"][granule]["attributes"]["xml"]["checksum"],
-                            "size": database["granules"][granule]["attributes"]["xml"]["size"],
+                            "checksum": database.granules[granule]["attributes"]["xml"]["checksum"],
+                            "size": database.granules[granule]["attributes"]["xml"]["size"],
                         },
                         {
-                            "name": database["granules"][granule]["attributes"]["h5"]["name"],
+                            "name": database.granules[granule]["attributes"]["h5"]["name"],
                             "type": "data",
-                            "uri": database["granules"][granule]["attributes"]["h5"]["path"],
+                            "uri": database.granules[granule]["attributes"]["h5"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": database["granules"][granule]["attributes"]["h5"]["checksum"],
-                            "size": database["granules"][granule]["attributes"]["h5"]["size"],
+                            "checksum": database.granules[granule]["attributes"]["h5"]["checksum"],
+                            "size": database.granules[granule]["attributes"]["h5"]["size"],
                         }
                     ]
                 }
@@ -191,14 +181,14 @@ try:
                 # Retry post
                 try:
                     individual_response = kinesis.put_record(StreamName=notification_stream, Data=record["Data"], PartitionKey=granule)
-                    database_status_update(granule, "tx_initiated")
+                    database.update_status(granule, Status.TX_INITIATED)
                     records_success += 1
                 except Exception as e:
-                    database_status_update(granule, "tx_failed")
+                    database.update_status(granule, Status.TX_FAILED)
                     print(f"Error! Failed to put granule {granule}: {e}")
                     records_failure += 1
             else:
-                database_status_update(granule, "tx_initiated")
+                database.update_status(granule, Status.TX_INITIATED)
                 records_success += 1
 
 except Exception:
@@ -212,11 +202,8 @@ finally:
     # Status
     print(f"Finished transfering {num_granules_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
 
-    # Save Database - written via a temporary file so that an interrupt cannot truncate the database
+    # Save Database
     if not args.test:
-        tmp_database = f"{args.database}.tmp"
-        with open(tmp_database, 'w') as file:
-            json.dump(database, file, indent=2)
-        os.replace(tmp_database, args.database)
+        database.write()
 
 sys.exit(exit_code)
