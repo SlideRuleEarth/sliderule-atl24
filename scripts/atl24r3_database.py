@@ -86,7 +86,6 @@ class Database:
     # Update granule attributes in database
     def update_attributes(self, granule, attributes):
         self.granules[granule]["attributes"] = attributes
-        self.update_status(granule, Status.TX_READY)
 
     # Write database out to file
     def write(self, filename=None):

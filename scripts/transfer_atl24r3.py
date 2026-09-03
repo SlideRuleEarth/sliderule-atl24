@@ -16,12 +16,13 @@ from atl24r3_database import Database, Status
 
 # Command Line Arguments
 parser = argparse.ArgumentParser(description="""ATL24""")
-parser.add_argument('--source',                 type=str,               default="s3://sliderule/data/ATL24r3")
+parser.add_argument('--stage',                  type=str,               default="s3://sliderule/data/ATL24r3")
 parser.add_argument('--database',               type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--data_version',           type=str,               default="003")
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
 parser.add_argument('--status_to_transfer',     type=Status,            default=Status.OUTPUT)
+parser.add_argument('--atl24_granule',          type=str,               default=None) # ATL24_20181014002954_02350105_007_01_003_01.h5
 parser.add_argument('--test',                   action='store_true',    default=False)
 parser.add_argument('--verbose',                action='store_true',    default=False)
 args = parser.parse_args()
@@ -72,7 +73,7 @@ def calc_checksum(bucket, key):
 
 # Get Size and SHA256 Checksum of S3 Object
 def get_attributes(filename):
-    bucket, subfolder = parse_url(args.source)
+    bucket, subfolder = parse_url(args.stage)
     key = f"{subfolder}/{filename}"
     response = s3.head_object(Bucket=bucket, Key=key, ChecksumMode="ENABLED")
     checksum = response.get("ChecksumSHA256")
@@ -82,7 +83,7 @@ def get_attributes(filename):
         checksum = calc_checksum(bucket, key)
     return {
         "name": filename,
-        "path": f"{args.source}/{filename}",
+        "path": f"{args.stage}/{filename}",
         "size": response["ContentLength"],
         "checksum": checksum
     }
@@ -92,11 +93,19 @@ def get_attributes(filename):
 # ###############################
 
 try:
-    # Get granules to transfer
-    granules_to_check = [granule for granule, entry in database.granules.items() if entry["status"] == args.status_to_transfer]
-    print(f"Preparing {len(granules_to_check)} granules with status {args.status_to_transfer}")
-    for i in range(len(granules_to_check)):
-        granule = granules_to_check[i]
+    # Get granules to process
+    if not args.atl24_granule:
+        granules_to_process = [granule for granule, entry in database.granules.items() if entry["status"] == args.status_to_transfer]
+        status_to_transfer = args.status_to_transfer
+    else:
+        atl03_granule = args.atl24_granule.replace("ATL24", "ATL03").replace("_003_01.h5", ".h5")
+        granules_to_process = [atl03_granule]
+        status_to_transfer = database.granules[atl03_granule]["status"]
+    print(f"Preparing {len(granules_to_process)} granule(s) with status {status_to_transfer}")
+
+    # Get attributes for each granule to process
+    for i in range(len(granules_to_process)):
+        granule = granules_to_process[i]
         atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
         if i % 10 == 0:
             sys.stdout.write(".")
@@ -106,6 +115,7 @@ try:
                 "h5": get_attributes(f"{atl24_granule}.h5"),
                 "xml": get_attributes(f"{atl24_granule}.iso.xml")
             })
+            database.update_status(granule, Status.TX_READY)
         except Exception as e:
             print(f"Error! Missing output for {granule}: {e}")
             database.update_status(granule, Status.MISSING)
@@ -113,7 +123,7 @@ try:
     sys.stdout.flush()
 
     # Initialize loop variables
-    granules_to_transfer = [granule for granule, entry in database.granules.items() if entry["status"] == Status.TX_READY]
+    granules_to_transfer = [granule for granule, entry in database.granules.items() if (entry["status"] == Status.TX_READY and granule in granules_to_process)]
     num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
     previous_cred_refresh = 0.0 # previous time
     print(f"Transfering {num_granules_to_transfer} of {len(granules_to_transfer)} granules ready to be transferred")
