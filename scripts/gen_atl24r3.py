@@ -1,14 +1,12 @@
 import importlib
 import boto3
-from h5coro import h5coro, s3driver
 import sys
 import json
 import random
 import string
 import argparse
-import numpy as np
-import geopandas as gpd
-from sliderule import sliderule, icesat2
+from sliderule import sliderule
+from atl24r3_database import Database, Status
 
 try:
     tqdm = importlib.import_module("tqdm").tqdm
@@ -38,42 +36,7 @@ args = parser.parse_args()
 #########################################
 # open database
 #########################################
-# {
-#     "submissions": {
-#         "<name>": {
-#             "run_url": <run url>,
-#             "job_id": <job id>,
-#             "status": {
-#                 "SUBMITTED": <x>,
-#                 "PENDING": <x>,
-#                 "RUNNABLE": <x>,
-#                 "STARTING": <x>,
-#                 "RUNNING": <x>,
-#                 "SUCCEEDED": <x>,
-#                 "FAILED": <x>
-#             },
-#             "complete": <true|false>
-#         },
-#         ...
-#     },
-#     "granules": {
-#         "<ATL03 granule>": {
-#             "name": <job>, -- of job responsible for processing granule
-#             "status": <"pending", "empty", "output", "error">, -- pending: has not run yet, empty: ran and produced no output, output: completed with results, error: failed to complete
-#             "rsps": <response from runner>,
-#             "duration": <seconds it took to complete>,
-#         }
-#     }
-# }
-try:
-    # read database
-    with open(args.database, "r") as file:
-        database = json.load(file)
-except:
-    # create database
-    with open(args.database, "w") as file:
-        database = {"submissions": {}, "granules": {}}
-        json.dump(database, file)
+database = Database(args.database)
 
 #########################################
 # create runner sessions and authentiate
@@ -90,24 +53,24 @@ def submit_job(name, granules):
     for i in range(0, len(granules), args.batch_size):
 
         # build and check name
-        name = f"{name}_{i}"
-        if name in database["submissions"]:
+        job_name = f"{name}_{i}"
+        if job_name in database.submissions:
             unique = ''.join(random.choices(string.ascii_lowercase, k=3))
-            name = f"{name}_{unique}_{i}"
+            job_name = f"{name}_{unique}_{i}"
 
         # submit job
         args_list = granules[i:i+args.batch_size]
         lua_script = open(args.script, "r").read()
-        rsps = session.runner.submit(name=name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
-        print(f"Submitted job {name} using script {args.script} with {len(args_list)} entries")
+        rsps = session.runner.submit(name=job_name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
+        print(f"Submitted job {job_name} using script {args.script} with {len(args_list)} entries")
 
         # save job
-        database["submissions"][name] = rsps | {"complete": False}
+        database.submissions[job_name] = rsps | {"complete": False}
         print(f"Saved job submission", rsps)
 
         # save granules
         for granule in args_list:
-            database["granules"][granule] = {"name": name, "status": "pending"}
+            database.granules[granule] = {"name": job_name, "status": Status.PENDING}
 
 #########################################
 # process granules for verification
@@ -139,8 +102,8 @@ if args.rerun:
 
     # get granules from database set
     granules = []
-    for granule,result in database["granules"].items():
-        if result["status"] == "error":
+    for granule,result in database.granules.items():
+        if result["status"] == Status.ERROR:
             granules.append(granule)
 
     # submit job
@@ -189,37 +152,37 @@ if args.status:
             try:
                 rsps = load_remote_file(bucket, f"{prefix}/result{i}.json")
                 result = {
-                    "status": rsps["status"] and "output" or "empty",
+                    "status": rsps["status"] and Status.OUTPUT or Status.EMPTY,
                     "duration": rsps["status"] and (rsps["stop"] - rsps["start"]) or 0.0,
                     "rsps": rsps
                 }
             except Exception as e:
-                result = {"status": "error"}
+                result = {"status": Status.ERROR}
             granule = args_list[i]
             results[granule] = result
         return results
 
     # get status
-    for name,job in database["submissions"].items():
+    for name,job in database.submissions.items():
         print(f"Statusing {name} - {job['complete'] and 'complete' or 'checking'}")
         if not job["complete"]:
             status = session.runner.queue(name=name, job_id=job["job_id"])["report"]
-            database["submissions"][name]["status"] = status
+            database.submissions[name]["status"] = status
             if sum([status[s] for s in ["SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING"]]) == 0:
                 print(f"Job {name} complete, reading results...")
                 results = get_results(job["run_url"])
                 for granule, result in tqdm(results.items(), total=len(results), desc=f"{name} results", unit="granule"):
                     if type(result) is dict:
-                        database["granules"][granule] |= result
+                        database.granules[granule] |= result
                     else:
                         print(f"Result for {granule}: {result}")
-                database["submissions"][name]["complete"] = True
+                database.submissions[name]["complete"] = True
 
     # display status
     columns = ["SUCCEEDED", "FAILED", "RUNNING", "STARTING", "RUNNABLE", "PENDING", "SUBMITTED"]
 
     print(",".join([f"{c:>30}" for c in ["NAME"]] + [f"{c:>10}" for c in columns]))
-    for name,job in database["submissions"].items():
+    for name,job in database.submissions.items():
         print(",".join([f"{c:>30}" for c in [name]] + [f"{c:>10}" for c in [job["status"][state] for state in columns]]))
 
 #########################################
@@ -227,13 +190,8 @@ if args.status:
 #########################################
 if args.report:
 
-    stats = {
-        "pending": 0,
-        "empty": 0,
-        "output": 0,
-        "error": 0
-    }
-    for granule,data in database["granules"].items():
+    stats = {status.value: 0 for status in Status}
+    for granule,data in database.granules.items():
         try:
             stats[data["status"]] += 1
         except Exception as e:
@@ -243,5 +201,4 @@ if args.report:
 #########################################
 # save database
 #########################################
-with open(args.database, 'w') as file:
-    json.dump(database, file)
+database.write()

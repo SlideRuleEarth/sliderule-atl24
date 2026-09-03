@@ -1,3 +1,32 @@
+# {
+#     "submissions": {
+#         "<name>": {
+#             "run_url": <run url>,
+#             "job_id": <job id>,
+#             "status": {
+#                 "SUBMITTED": <x>,
+#                 "PENDING": <x>,
+#                 "RUNNABLE": <x>,
+#                 "STARTING": <x>,
+#                 "RUNNING": <x>,
+#                 "SUCCEEDED": <x>,
+#                 "FAILED": <x>
+#             },
+#             "complete": <true|false>
+#         },
+#         ...
+#     },
+#     "granules": {
+#         "<ATL03 granule>": {
+#             "name": <job>, -- of job responsible for processing granule
+#             "status": <status>,
+#             "rsps": <response from runner>,
+#             "duration": <seconds it took to complete>,
+#             "attributes": <custom dictionary>
+#         }
+#     }
+# }
+
 import json
 import os
 from enum import Enum
@@ -32,8 +61,15 @@ class Database:
 
     def __init__(self, filename):
         self.filename = filename
-        with open(filename, "r") as file:
-            self.database = json.load(file)
+        try:
+            # read database
+            with open(filename, "r") as file:
+                self.database = json.load(file)
+        except FileNotFoundError:
+            # create database
+            with open(filename, "w") as file:
+                self.database = {"submissions": {}, "granules": {}}
+                json.dump(self.database, file)
 
     @property
     def granules(self):
