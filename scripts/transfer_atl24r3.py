@@ -21,7 +21,7 @@ parser.add_argument('--database',               type=str,               default=
 parser.add_argument('--data_version',           type=str,               default="003")
 parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
-parser.add_argument('--granules_to_transfer',   type=str,               default="output")
+parser.add_argument('--status_to_transfer',     type=str,               default="output")
 parser.add_argument('--test',                   action='store_true',    default=False)
 parser.add_argument('--verbose',                action='store_true',    default=False)
 args = parser.parse_args()
@@ -29,7 +29,6 @@ args = parser.parse_args()
 # transfer parameters
 collection              = "ATL24"
 provider                = "ICESat-2_sliderule"
-partition_key           = "SlideRule"
 if args.test:
     response_stream_arn = "arn:aws:kinesis:us-west-2:941673577314:stream/nsidc-cumulus-uat-external_response"
     assume_role         = "arn:aws:iam::024284894447:role/nsidc-ops-uat_cross_provider_kinesis_role"
@@ -48,6 +47,9 @@ with open(args.database, "r") as file:
 
 # program status
 exit_code = 0
+num_granules_to_transfer = 0
+records_success = 0
+records_failure = 0
 
 # ###############################
 # Helper Functions
@@ -99,10 +101,11 @@ def database_attributes_update(granule, attrs):
 # Main
 # ###############################
 
+
 try:
     # Get granules to transfer
     for granule, entry in database["granules"].items():
-        if entry["status"] == args.granules_to_transfer:
+        if entry["status"] == args.status_to_transfer:
             atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
             try:
                 database_attributes_update(granule, {
@@ -110,14 +113,12 @@ try:
                     "xml": get_attributes(f"{atl24_granule}.iso.xml")
                 })
             except Exception as e:
-                print(f"Error! Missing output for {granule}")
+                print(f"Error! Missing output for {granule}: {e}")
                 database_status_update(granule, "missing")
 
     # Initialize loop variables
     granules_to_transfer = [granule for granule in database["granules"] if database["granules"][granule]["status"] == "tx_ready"]
     num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
-    records_success = 0
-    records_failure = 0
     previous_cred_refresh = 0.0 # previous time
 
     # Post records to stream
@@ -194,14 +195,11 @@ try:
                     records_success += 1
                 except Exception as e:
                     database_status_update(granule, "tx_failed")
-                    print(f"Error! Failed to put granule {atl24_granule}: {e}")
+                    print(f"Error! Failed to put granule {granule}: {e}")
                     records_failure += 1
             else:
                 database_status_update(granule, "tx_initiated")
                 records_success += 1
-
-    # Status Success
-    print(f"Finished transfering {num_granules_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
 
 except Exception:
 
@@ -210,6 +208,9 @@ except Exception:
     exit_code = 1
 
 finally:
+
+    # Status
+    print(f"Finished transfering {num_granules_to_transfer} records: {records_success} succeeded, {records_failure} failed.")
 
     # Save Database - written via a temporary file so that an interrupt cannot truncate the database
     if not args.test:
