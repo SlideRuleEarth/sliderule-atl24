@@ -15,7 +15,7 @@ from atl24r3_database import Database, Status
 # ###############################
 
 # Command Line Arguments
-parser = argparse.ArgumentParser(description="""ATL24""")
+parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
 parser.add_argument('--stage',                  type=str,               default="s3://sliderule/data/ATL24r3")
 parser.add_argument('--database',               type=str,               default="data/atl24r3_database.json")
 parser.add_argument('--data_version',           type=str,               default="003")

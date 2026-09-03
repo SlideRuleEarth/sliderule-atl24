@@ -11,7 +11,7 @@ from atl24r3_database import Database, Status
 #
 # Command Line Arguments
 #
-parser = argparse.ArgumentParser(description="""ATL24""")
+parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
 parser.add_argument('--database',       type=str,   default="data/atl24r3_database.json")
 parser.add_argument('--atl03_granule',  type=str,   default=None) # "ATL03_20191215112656_12150507_006_01.h5"
 args = parser.parse_args()
