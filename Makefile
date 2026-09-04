@@ -50,7 +50,7 @@ tag:
 
 release: distclean tag config-stage-release all
 
-docker-runner:
+docker-atl24:
 	-rm -Rf $(STAGE)
 	mkdir -p $(STAGE)
 	rsync -a $(ROOT) $(STAGE) --exclude build --exclude stage --exclude data
@@ -58,10 +58,10 @@ docker-runner:
 	rsync -a $(ATL24) $(STAGE) --exclude build --exclude stage
 	cp docker/atl24/Dockerfile $(STAGE)
 	cp docker/atl24/docker-entrypoint.sh $(STAGE)
-	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:runner .
+	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:atl24 .
 
 docker-push:
-	docker push $(CONTAINER_REGISTRY)/sliderule:runner
+	docker push $(CONTAINER_REGISTRY)/sliderule:atl24
 
 test-docker-run:
 	docker run \

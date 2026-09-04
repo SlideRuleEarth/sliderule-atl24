@@ -56,7 +56,7 @@ def submit_job(name, granules):
         # submit job
         args_list = granules[i:i+args.batch_size]
         lua_script = open(args.script, "r").read()
-        rsps = session.runner.submit(name=job_name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory})
+        rsps = session.runner.submit(name=job_name, script=lua_script, args=args_list, optional_args={"vcpus":args.vcpus, "memory":args.memory, "image": "sliderule:atl24"})
         print(f"Submitted job {job_name} using script {args.script} with {len(args_list)} entries")
 
         # save job
