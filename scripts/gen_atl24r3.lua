@@ -181,8 +181,8 @@ repeat
     end
     local poly_list = {}
     for i=1,#lat_poly do
-        table.insert(poly_list, string.format("%.15f", lon_poly[i]))
         table.insert(poly_list, string.format("%.15f", lat_poly[i]))
+        table.insert(poly_list, string.format("%.15f", lon_poly[i]))
     end
     local poly_str = table.concat(poly_list, " ")
 

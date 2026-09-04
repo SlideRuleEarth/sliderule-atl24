@@ -4,7 +4,7 @@ import boto3
 
 # command line arguments
 parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
-parser.add_argument('--source_xml', type=str,   default="s3://sliderule-public/atl24r3/xml")
+parser.add_argument('--source', type=str,   default="s3://sliderule-public/atl24r3/xml")
 args = parser.parse_args()
 
 # display raw
@@ -30,7 +30,7 @@ def store_remote_file(bucket, key, content):
 
 # globals
 s3 = boto3.client("s3")
-bucket, subfolder = parse_url(args.source_xml)
+bucket, subfolder = parse_url(args.source)
 
 # enumerate objects in s3 bucket
 xml_filenames = []
@@ -43,7 +43,8 @@ while is_truncated:
     if 'Contents' in response:
         for obj in response['Contents']:
             resource = obj['Key'].split("/")[-1]
-            xml_filenames.append(resource)
+            if resource.endswith(".xml"):
+                xml_filenames.append(resource)
     is_truncated = response['IsTruncated']
     continuation_token = response.get('NextContinuationToken')
 display("\n")
@@ -53,9 +54,21 @@ print(f"Processing {len(xml_filenames)} files")
 for xml_filename in xml_filenames:
     path = f"{subfolder}/{xml_filename}"
     content = load_remote_file(bucket, path)
-    if content.find("<gco:CharacterString>001</gco:CharacterString>") >= 0:
-        print(f"Fixing {path}")
-        content = content.replace("<gco:DateTime>\"", "<gco:DateTime>").replace("\"</gco:DateTime>", "</gco:DateTime>").replace("<gco:CharacterString>001</gco:CharacterString>", "<gco:CharacterString>003</gco:CharacterString>")
-        store_remote_file(bucket, path, content)
-    else:
-        print(f"Skipping {path}")
+    print(f"Fixing {path}")
+    # remove double quotes from date times
+    content = content.replace("<gco:DateTime>\"", "<gco:DateTime>")
+    content = content.replace("\"</gco:DateTime>", "</gco:DateTime>")
+    # change version to release
+    content = content.replace("<gco:CharacterString>001</gco:CharacterString>", "<gco:CharacterString>003</gco:CharacterString>")
+    # polygon is lat lon, not lon lat
+    start = '<gml:posList srsDimension="2" srsName="http://www.opengis.net/def/crs/EPSG/4326">'
+    end = '</gml:posList>'
+    poly_old_str = content[content.find(start) + len(start):content.find(end)]
+    poly_old_list = poly_old_str.split()
+    poly_new_list = []
+    for i in range(0, len(poly_old_list), 2):
+        poly_new_list.append(poly_old_list[i+1])
+        poly_new_list.append(poly_old_list[i])
+    poly_new_str = ' '.join(poly_new_list)
+    content = content.replace(poly_old_str, poly_new_str)
+    store_remote_file(bucket, path, content)
