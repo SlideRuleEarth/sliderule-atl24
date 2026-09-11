@@ -60,7 +60,7 @@ docker-atl24:
 	cp docker/atl24/docker-entrypoint.sh $(STAGE)
 	cd $(STAGE) && docker build --build-arg repo=$(CONTAINER_REGISTRY) -t $(CONTAINER_REGISTRY)/sliderule:atl24 .
 
-docker-push:
+docker-atl24-push:
 	docker push $(CONTAINER_REGISTRY)/sliderule:atl24
 
 test-docker-run:
@@ -83,8 +83,11 @@ test-docker-run:
 		$(CONTAINER_REGISTRY)/sliderule:runner \
 		/usr/local/etc/sliderule/job_runner.lua $(ROOT)/scripts/gen_atl24r3.lua ATL03_20181028071900_04530107_006_02.h5 /tmp
 
-test-atl24-run: install
+test-local-run: install
 	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/scripts/gen_atl24r3.lua ATL03_20191215112656_12150507_006_01.h5 /tmp"
+
+test-vset-run:
+	sliderule-runner submit atl24r3_vset_run1 scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
 
 clean:
 	- make -C $(BUILD) clean
