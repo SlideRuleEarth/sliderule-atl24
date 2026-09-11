@@ -19,7 +19,7 @@ kinesis_client = boto3.client(
     aws_session_token=credentials['SessionToken'])
 
 # Get the shard iterator
-stream_name = "nsidc-ops-uat-ATLAS_sliderule_response"
+stream_name = "nsidc-ops-uat-ATLAS_sliderule_response" # nsidc-ops-prod-ATLAS_sliderule_response
 response = kinesis_client.describe_stream(StreamName=stream_name)
 shard_id = response["StreamDescription"]["Shards"][0]["ShardId"]
 shard_iterator_response = kinesis_client.get_shard_iterator(

@@ -38,6 +38,7 @@ repeat
 
     -- request structure
     local rqst = {
+        ["cnf"] = -1,
         ["output"] = {
             ["asset"] = "sliderule-stage",
             ["format"] = "geoparquet",
@@ -54,7 +55,7 @@ repeat
     end
 
     -- create objects used in processing granule
-    local parms         = bathy.parms(rqst, nil, "icesat2", resource)
+    local parms         = bathy.parms(rqst, 0, "icesat2", resource)
     local bathymask     = bathy.mask()
     local atl03h5       = h5coro.object(parms["asset"], resource)
     local granule       = icesat2.atl03granule(parms, atl03h5, "consoleq")
