@@ -1,5 +1,6 @@
 import argparse
 import base64
+import os
 import sys
 import traceback
 import boto3
@@ -7,8 +8,8 @@ import hashlib
 import json
 import uuid
 import time
+from enum import Enum
 from datetime import datetime, timezone
-from atl24r3_database import Database, Status
 
 # ###############################
 # Globals
@@ -16,16 +17,15 @@ from atl24r3_database import Database, Status
 
 # Command Line Arguments
 parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
-parser.add_argument('--stage',                  type=str,               default="s3://sliderule/data/ATL24r3")
-parser.add_argument('--database',               type=str,               default="data/atl24r3_database.json")
-parser.add_argument('--data_version',           type=str,               default="003")
-parser.add_argument('--transfer',               type=int,               default=0) # must provide in order to actually transfer
-parser.add_argument('--batch_size',             type=int,               default=100, choices=range(1, 501))
-parser.add_argument('--status_to_transfer',     type=Status,            default=Status.OUTPUT)
-parser.add_argument('--throttle',               type=float,             default=0.1) # seconds
-parser.add_argument('--atl24_granule',          type=str,               default=None) # ATL24_20181014002954_02350105_007_01_003_01.h5
-parser.add_argument('--test',                   action='store_true',    default=False)
-parser.add_argument('--verbose',                action='store_true',    default=False)
+parser.add_argument('--stage',          type=str,               default="s3://sliderule/data/ATL24r3")
+parser.add_argument('--cache',          type=str,               default="data/atl24r3_cache.json")
+parser.add_argument('--data_version',   type=str,               default="003")
+parser.add_argument('--transfer',       type=int,               default=0) # must provide in order to actually transfer
+parser.add_argument('--batch_size',     type=int,               default=100, choices=range(1, 501))
+parser.add_argument('--throttle',       type=float,             default=0.1) # seconds
+parser.add_argument('--granule',        type=str,               default=None) # ATL24_20181014002954_02350105_007_01_003_01.h5
+parser.add_argument('--test',           action='store_true',    default=False)
+parser.add_argument('--verbose',        action='store_true',    default=False)
 args = parser.parse_args()
 
 # transfer parameters
@@ -43,14 +43,21 @@ else:
 # create s3 client
 s3 = boto3.client("s3")
 
-# read database
-database = Database(args.database)
-
 # program status
 exit_code = 0
 num_granules_to_transfer = 0
 records_success = 0
 records_failure = 0
+
+# ###############################
+# Status Class
+# ###############################
+
+class Status(str, Enum):
+    TX_READY        = "tx_ready"        # output located in s3 and attributes collected
+    TX_INITIATED    = "tx_initiated"    # notification posted to the NSIDC stream
+    TX_FAILED       = "tx_failed"       # notification could not be posted
+    MISSING         = "missing"         # output could not be located in s3
 
 # ###############################
 # Helper Functions
@@ -89,42 +96,68 @@ def get_attributes(filename):
         "checksum": checksum
     }
 
+# list S3 bucket
+def list_bucket(suffix=".h5"):
+    def display(s):
+        sys.stdout.write(s)
+        sys.stdout.flush()
+    bucket, subfolder = parse_url(args.stage)
+    resources = []
+    is_truncated = True
+    continuation_token = None
+    while is_truncated:
+        if continuation_token: response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder, ContinuationToken=continuation_token)
+        else: response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder)
+        display("#")
+        # parse contents
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                if obj['Key'].endswith(suffix):
+                    resources.append(obj['Key'].split("/")[-1])
+        # check if more data is available
+        is_truncated = response['IsTruncated']
+        continuation_token = response.get('NextContinuationToken')
+    display("\n")
+    return resources
+
 # ###############################
 # Main
 # ###############################
 
 try:
+    # Open cache of granules transferred
+    cache = {}
+    if os.path.exists(args.cache):
+        with open(args.cache, "r") as file:
+            cache = json.load(file)
+
     # Get granules to process
-    if not args.atl24_granule:
-        granules_to_process = [granule for granule, entry in database.granules.items() if entry["status"] == args.status_to_transfer]
-        status_to_transfer = args.status_to_transfer
-    else:
-        atl03_granule = args.atl24_granule.replace("ATL24", "ATL03").replace("_003_01.h5", ".h5")
-        granules_to_process = [atl03_granule]
-        status_to_transfer = database.granules[atl03_granule]["status"]
-    print(f"Preparing {len(granules_to_process)} granule(s) with status {status_to_transfer}")
+    all_available_granules = args.granule and [args.granule] or list_bucket()
+    granules_to_process = [granule for granule in all_available_granules if (granule in cache and cache[granule]["status"] != Status.TX_INITIATED)]
+    print(f"Preparing to transfer {len(granules_to_process)} granule(s)")
 
     # Get attributes for each granule to process
     for i in range(len(granules_to_process)):
         granule = granules_to_process[i]
-        atl24_granule = granule.replace("ATL03", "ATL24").replace(".h5", f"_{args.data_version}_01")
         if i % 10 == 0:
             sys.stdout.write(".")
             sys.stdout.flush()
         try:
-            database.update_attributes(granule, {
-                "h5": get_attributes(f"{atl24_granule}.h5"),
-                "xml": get_attributes(f"{atl24_granule}.iso.xml")
-            })
-            database.update_status(granule, Status.TX_READY)
+            cache[granule] = {
+                "h5": get_attributes(f"{granule}.h5"),
+                "xml": get_attributes(f"{granule}.iso.xml"),
+                "status": Status.TX_READY
+            }
         except Exception as e:
             print(f"Error! Missing output for {granule}: {e}")
-            database.update_status(granule, Status.MISSING)
+            cache[granule] = {
+                "status": Status.MISSING
+            }
     sys.stdout.write("\n")
     sys.stdout.flush()
 
     # Initialize loop variables
-    granules_to_transfer = [granule for granule, entry in database.granules.items() if (entry["status"] == Status.TX_READY and granule in granules_to_process)]
+    granules_to_transfer = [granule for granule, entry in cache.items() if (entry["status"] == Status.TX_READY and granule in granules_to_process)]
     num_granules_to_transfer = min(len(granules_to_transfer), args.transfer)
     previous_cred_refresh = 0.0 # previous time
     print(f"Transfering {num_granules_to_transfer} of {len(granules_to_transfer)} granules ready to be transferred")
@@ -161,24 +194,24 @@ try:
                 "provider": provider,
                 "responseStreamArn": response_stream_arn,
                 "product": {
-                    "name": database.granules[granule]["attributes"]["h5"]["name"],
+                    "name": cache[granule]["attributes"]["h5"]["name"],
                     "dataVersion": args.data_version,
                     "files": [
                         {
-                            "name": database.granules[granule]["attributes"]["xml"]["name"],
+                            "name": cache[granule]["attributes"]["xml"]["name"],
                             "type": "metadata",
-                            "uri": database.granules[granule]["attributes"]["xml"]["path"],
+                            "uri": cache[granule]["attributes"]["xml"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": database.granules[granule]["attributes"]["xml"]["checksum"],
-                            "size": database.granules[granule]["attributes"]["xml"]["size"],
+                            "checksum": cache[granule]["attributes"]["xml"]["checksum"],
+                            "size": cache[granule]["attributes"]["xml"]["size"],
                         },
                         {
-                            "name": database.granules[granule]["attributes"]["h5"]["name"],
+                            "name": cache[granule]["attributes"]["h5"]["name"],
                             "type": "data",
-                            "uri": database.granules[granule]["attributes"]["h5"]["path"],
+                            "uri": cache[granule]["attributes"]["h5"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": database.granules[granule]["attributes"]["h5"]["checksum"],
-                            "size": database.granules[granule]["attributes"]["h5"]["size"],
+                            "checksum": cache[granule]["attributes"]["h5"]["checksum"],
+                            "size": cache[granule]["attributes"]["h5"]["size"],
                         }
                     ]
                 }
@@ -195,14 +228,15 @@ try:
                 try:
                     time.sleep(args.throttle)
                     individual_response = kinesis.put_record(StreamName=notification_stream, Data=record["Data"], PartitionKey=granule)
-                    database.update_status(granule, Status.TX_INITIATED)
+                    cache[granule]["status"] = Status.TX_INITIATED
                     records_success += 1
                 except Exception as e:
-                    database.update_status(granule, Status.TX_FAILED)
                     print(f"Error! Failed to put granule {granule}: {e}")
+                    cache[granule]["status"] = Status.TX_FAILED
                     records_failure += 1
             else:
-                database.update_status(granule, Status.TX_INITIATED)
+                # Success
+                cache[granule]["status"] = Status.TX_INITIATED
                 records_success += 1
 
 except Exception:
@@ -218,6 +252,9 @@ finally:
 
     # Save Database
     if not args.test:
-        database.write()
+        tmp_filename = f"{args.cache}.tmp"
+        with open(tmp_filename, "w") as file:
+            json.dump(cache, file, indent=2)
+        os.replace(tmp_filename, args.cache)
 
 sys.exit(exit_code)
