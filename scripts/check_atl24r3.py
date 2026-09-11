@@ -6,21 +6,14 @@ import geopandas as gpd
 import numpy as np
 from h5coro import h5coro, s3driver
 from sliderule import icesat2
-from atl24r3_database import Database, Status
 
 #
 # Command Line Arguments
 #
 parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
-parser.add_argument('--database',       type=str,   default="data/atl24r3_database.json")
+parser.add_argument('--atl03_granules', type=str,   default="data/atl24r3_validation_set.txt")
 parser.add_argument('--atl03_granule',  type=str,   default=None) # "ATL03_20191215112656_12150507_006_01.h5"
 args = parser.parse_args()
-
-#
-# Read Database
-#
-print(f"Reading database {args.database} ...")
-database = Database(args.database)
 
 #
 # Authenticate with Earth Access
@@ -33,7 +26,7 @@ nsidc_creds = auth.get_s3_credentials(daac="NSIDC")
 # Constants
 #
 VERSIONS = {
-    "sliderule_version":    "v5.5.1",
+    "sliderule_version":    "v5.5.2",
     "atl24_plugin_version": "v3.0.3",
     "alt24_algo_version":   "b09eb09"
 }
@@ -231,6 +224,16 @@ def compare_parquet_to_h5(h5_df, parquet_df):
             raise RuntimeError(f'Error - {var}: {diffs.sum()} mismatched values in {len(parquet_vals)} rows, max diff {max_diff}')
 
 #
+# Check Expectations
+#
+def check_expectations(parquet_df):
+    print(f"... expectation check")
+    vc = parquet_df["max_signal_conf"].value_counts()
+    for c in [0, 1, 2, 3, 4]:
+        if c not in vc:
+            raise RuntimeError(f"Expected to see photons with confidence {c}")
+
+#
 # Check Metadata
 #
 def check_metadata(metadata):
@@ -365,7 +368,6 @@ def check_atl03_calculations(atl03_ph_df, atl03_geo_df, atl03_metadata, atl24_df
     print(f'... refraction avg {lat_refraction_acc / len(h5_lats):.2e}, {lon_refraction_acc / len(h5_lons):.2e}, {z_refraction_acc / len(h5_h):.2e}')
     print(f'... refraction max {lat_refraction_max:.2e}, {lon_refraction_max:.2e}, {z_refraction_max:.2e}')
 
-
 #
 # Analyze ATL24 Result
 #
@@ -375,6 +377,10 @@ def analyze_atl24_result(atl03_granule):
         atl03_ph_df_all, atl03_geo_df_all, atl03_metadata = read_atl03_h5(atl03_granule)
         atl24_df_all, atl24_metadata = read_atl24_h5(atl03_granule)
         parquet_df_all = read_atl24_parquet(atl03_granule)
+        try:
+            check_expectations(parquet_df_all)
+        except Exception as e:
+            print(f"??? {atl03_granule} - warning: {e}")
         check_metadata(atl24_metadata)
         check_bounding_polygons(atl03_metadata, atl24_metadata)
         for beam in BEAMS:
@@ -394,9 +400,11 @@ def analyze_atl24_result(atl03_granule):
 # Main
 #
 if __name__ == "__main__":
-    atl03_granules = args.atl03_granule and [args.atl03_granule] or database.granules
+    if args.atl03_granule:
+        atl03_granules = [args.atl03_granule]
+    else:
+        print(f"Reading granules from {args.atl03_granules} ...")
+        with open(args.atl03_granules, "r") as file:
+            atl03_granules = [line.strip() for line in file.readlines() if line.strip()]
     for atl03_granule in atl03_granules:
-        if database.granules[atl03_granule]["status"] in [Status.PENDING, Status.EMPTY, Status.ERROR]:
-            print(f"*** {atl03_granule} - skipped analysis due to status: {database.granules[atl03_granule]["status"]}")
-        else:
-            analyze_atl24_result(atl03_granule)
+        analyze_atl24_result(atl03_granule)
