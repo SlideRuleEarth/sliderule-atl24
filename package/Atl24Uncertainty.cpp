@@ -37,6 +37,9 @@
 #include <numeric>
 #include <algorithm>
 
+#include "estimate_kd.h"
+#include "estimate_surface_roughness.h"
+
 #include "OsApi.h"
 #include "GeoLib.h"
 #include "Atl24Uncertainty.h"
@@ -306,9 +309,19 @@ bool Atl24Uncertainty::run (GeoDataFrame* dataframe)
         /* get pointing angle index */
         const int pointing_angle_index = discretize(elrad2deg((*ref_el)[i]), 0, NUM_POINTING_ANGLES);
 
+        /* get kd input */
+        const ATL24::estimate_kd::Params kd_params;
+        float kd_input = (*kd)[i];
+        if(kd_input == kd_params.invalid_value) kd_input = kd_params.sentry_value;
+
+        /* get surface roughness input */
+        const ATL24::estimate_surface_roughness::Params surface_roughness_params;
+        float surface_roughness_input = (*surface_roughness)[i];
+        if(surface_roughness_input == surface_roughness_params.invalid_value) surface_roughness_input = surface_roughness_params.sentry_value;
+
         /* get lookup table entry index */
-        const int wind_speed_lookup = discretize((*surface_roughness)[i], 0, NUM_WIND_SPEEDS, D_CEILING);
-        const int kd_lookup = discretize((*kd)[i] * 100.0, 0, NUM_KDS, D_CEILING);
+        const int wind_speed_lookup = discretize(surface_roughness_input, 0, NUM_WIND_SPEEDS, D_CEILING);
+        const int kd_lookup = discretize(kd_input * 100.0, 0, NUM_KDS, D_CEILING);
         int entry_index = (WIND_SPEED_INDEX[wind_speed_lookup] * 5) + KD_INDEX[kd_lookup];
         if(entry_index < 0 || entry_index >= NUM_TABLE_ENTRIES)
         {

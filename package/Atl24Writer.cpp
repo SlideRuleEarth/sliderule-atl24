@@ -35,6 +35,9 @@
 
 #include <uuid/uuid.h>
 
+#include "estimate_kd.h"
+#include "estimate_surface_roughness.h"
+
 #include "Atl24Writer.h"
 #include "PluginFields.h"
 #include "OsApi.h"
@@ -106,6 +109,14 @@ static void add_attribute_double(List<HdfLib::dataset_t>& datasets, const char* 
     double* buffer = new double[1];
     buffer[0] = value;
     HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::DOUBLE, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
+    datasets.add(attribute);
+}
+
+static void add_attribute_float(List<HdfLib::dataset_t>& datasets, const char* name, const float value)
+{
+    float* buffer = new float[1];
+    buffer[0] = value;
+    HdfLib::dataset_t attribute = {name, HdfLib::ATTRIBUTE, RecordObject::FLOAT, reinterpret_cast<uint8_t*>(buffer), sizeof(value)};
     datasets.add(attribute);
 }
 
@@ -457,6 +468,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
 
             /* Create Variable - kd */
             FieldColumn<float>* kd = reinterpret_cast<FieldColumn<float>*>(df->getColumn("kd"));
+            const ATL24::estimate_kd::Params kd_params;
             add_variable(datasets, "kd", kd);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
@@ -464,10 +476,12 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Turbidity");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
+            add_attribute_float(datasets, "_FillValue", kd_params.invalid_value);
             goto_parent(datasets);
 
             /* Create Variable - surface_roughness */
             FieldColumn<float>* surface_roughness = reinterpret_cast<FieldColumn<float>*>(df->getColumn("surface_roughness"));
+            const ATL24::estimate_kd::Params surface_roughness_params;
             add_variable(datasets, "surface_roughness", surface_roughness);
             add_attribute(datasets, "contentType", "modelResult");
             add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
@@ -475,6 +489,7 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute(datasets, "long_name", "Surface Roughness");
             add_attribute(datasets, "source", "ATL03");
             add_attribute(datasets, "units", "meters");
+            add_attribute_float(datasets, "_FillValue", surface_roughness_params.invalid_value);
             goto_parent(datasets);
 
             /* Go Back to Parent Group */

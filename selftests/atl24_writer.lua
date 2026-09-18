@@ -21,7 +21,7 @@ runner.unittest("ATL24 HDF5 Writer", function()
     local classifier    = atl24.classifier(parms)
     local refractor     = bathy.refraction(parms)
     local uncertainty   = atl24.uncertainty(parms)
-    local sender        = core.framesender(parms, "rspq")
+    local sender        = core.framesender(parms, "rspq", resource)
     local dataframe     = core.dataframe({}, {granule=resource, request=json.encode(rqst)})
     local dataframes    = {} -- holds beam dataframes
 
