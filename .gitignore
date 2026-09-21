@@ -4,4 +4,3 @@ stage/
 __pycache__/
 .pytest_cache/
 .cookies
-data/

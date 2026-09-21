@@ -26,9 +26,9 @@ nsidc_creds = auth.get_s3_credentials(daac="NSIDC")
 # Constants
 #
 VERSIONS = {
-    "sliderule_version":    "v5.5.2",
-    "atl24_plugin_version": "v3.0.3",
-    "alt24_algo_version":   "b09eb09"
+    "sliderule_version":    "v5.6.1",
+    "atl24_plugin_version": "v3.1.0",
+    "alt24_algo_version":   "eca4bf8"
 }
 
 INFO_TO_SPOT = { # [SC_ORIENT][TRACK][PAIR]
