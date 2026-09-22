@@ -87,7 +87,7 @@ test-local-run: install
 	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/scripts/gen_atl24r3.lua ATL03_20191215112656_12150507_006_01.h5 /tmp"
 
 test-vset-run:
-	sliderule-runner submit atl24r3_vset_run1 scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
+	sliderule-runner submit atl24r3_vset_run scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
 
 clean:
 	- make -C $(BUILD) clean
