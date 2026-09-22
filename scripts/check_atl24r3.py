@@ -80,7 +80,8 @@ ATL24_VARS = [
     "x_atc",
     "y_atc",
     "kd",
-    "surface_roughness"
+    "surface_roughness",
+    "quality_ph"
 ]
 
 ATL03_PH_VARS = [
@@ -89,7 +90,8 @@ ATL03_PH_VARS = [
     "heights/lon_ph",
     "heights/dist_ph_across",
     "heights/dist_ph_along",
-    "heights/h_ph"
+    "heights/h_ph",
+    "heights/quality_ph"
 ]
 
 ATL03_GEO_VARS = [
@@ -291,6 +293,7 @@ def check_atl03_calculations(atl03_ph_df, atl03_geo_df, atl03_metadata, atl24_df
     h5_distacross = atl03_ph_df["heights/dist_ph_across"].to_numpy()
     h5_distalong = atl03_ph_df["heights/dist_ph_along"].to_numpy()
     h5_h = atl03_ph_df["heights/h_ph"].to_numpy()
+    h5_quality_ph = atl03_ph_df["heights/quality_ph"].to_numpy()
     h5_distseg = atl03_geo_df["geolocation/segment_dist_x"].to_numpy()
     h5_geoid = atl03_geo_df["geophys_corr/geoid"].to_numpy()
     h5_solar = atl03_geo_df["geolocation/solar_elevation"].to_numpy()
@@ -307,6 +310,7 @@ def check_atl03_calculations(atl03_ph_df, atl03_geo_df, atl03_metadata, atl24_df
     df_geoid = atl24_df["ortho_h"].to_numpy()
     df_ellipse = atl24_df["ellipse_h"].to_numpy()
     df_night = atl24_df["night_flag"].to_numpy()
+    df_quality_ph = atl24_df["quality_ph"].to_numpy()
 
     # initialize refraction stats
     lat_refraction_acc = 0.0
@@ -350,6 +354,10 @@ def check_atl03_calculations(atl03_ph_df, atl03_geo_df, atl03_metadata, atl24_df
         night_flag = df_night[i] != 0
         if is_night != night_flag:
             raise RuntimeError(f'Mismatched value - night_flag on row {i} at photon index {df_ph[i]} and segment index {df_seg[i]}: {df_night[i]} {h5_solar[df_seg[i]]}')
+
+        # quality_ph
+        if h5_quality_ph[df_ph[i]] != df_quality_ph[i]:
+            raise RuntimeError(f'Mismatched value - quality_ph on row {i} at photon index {df_ph[i]}: {h5_quality_ph[df_ph[i]]} != {df_quality_ph[i]}')
 
         # lat_ph, lon_ph
         lat_delta = abs(h5_lats[df_ph[i]] - df_lats[i])

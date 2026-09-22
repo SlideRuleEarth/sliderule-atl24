@@ -492,6 +492,17 @@ int Atl24Writer::luaWriteFile(lua_State* L)
             add_attribute_float(datasets, "_FillValue", surface_roughness_params.invalid_value);
             goto_parent(datasets);
 
+            /* Create Variable - quality_ph */
+            FieldColumn<int8_t>* quality_ph = reinterpret_cast<FieldColumn<int8_t>*>(df->getColumn("quality_ph"));
+            add_variable(datasets, "quality_ph", quality_ph);
+            add_attribute(datasets, "contentType", "qualityInformation");
+            add_attribute(datasets, "coordinates", "delta_time lat_ph lon_ph");
+            add_attribute(datasets, "description", "Indicates the quality of the associated photon. See ATL03 ATBD: ATLAS Saturation.");
+            add_attribute(datasets, "long_name", "Photon Quality");
+            add_attribute(datasets, "source", "ATL03");
+            add_attribute(datasets, "units", "1");
+            goto_parent(datasets);
+
             /* Go Back to Parent Group */
             goto_parent(datasets);
         }

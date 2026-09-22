@@ -34,7 +34,12 @@ repeat
 
     -- request structure
     local rqst = {
-        ["cnf"] = -1,
+        ["cnf"] = -2,
+        ["quality_ph"] = {
+            "atl03_quality_nominal", "atl03_quality_afterpulse", "atl03_quality_impulse_response", "atl03_quality_tep", "atl03_quality_noise_burst", "atl03_quality_noise_streak",
+            "atl03_quality_tx_part_sat", "atl03_quality_tx_part_sat_afterpulse", "atl03_quality_tx_part_sat_ir_effect", "atl03_quality_tx_part_sat_burst", "atl03_quality_tx_part_sat_streak",
+            "atl03_quality_tx_full_sat", "atl03_quality_tx_full_sat_afterpulse", "atl03_quality_tx_full_sat_ir_effect", "atl03_quality_tx_full_sat_burst", "atl03_quality_tx_full_sat_streak"
+        },
         ["output"] = {
             ["asset"] = "sliderule-stage",
             ["format"] = "geoparquet",
