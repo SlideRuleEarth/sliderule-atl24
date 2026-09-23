@@ -87,7 +87,12 @@ test-local-run: install
 	make -C $(SLIDERULE)/targets/slideruleearth job ARGS="$(ROOT)/scripts/gen_atl24r3.lua ATL03_20191215112656_12150507_006_01.h5 /tmp"
 
 test-vset-run:
-	sliderule-runner submit atl24r3_vset_run scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
+	sliderule-runner submit atl24r3_vset scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
+
+CYCLE ?=
+platinum-run:
+	python scripts/gen_cycle_dataset.py $(CYCLE)
+	sliderule-runner submit atl24r3_cycle_$(CYCLE) scripts/gen_atl24r3.lua data/atl03_granules_cycle_$(CYCLE).txt --image sliderule:atl24
 
 clean:
 	- make -C $(BUILD) clean

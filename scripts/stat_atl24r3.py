@@ -174,7 +174,7 @@ if __name__ == "__main__":
         granule = granules[i]
 
         # read granule into GeoDataFrames
-        print(f"Processing file {i} of {len(granules)}: {granule}")
+        print(f"Processing file {i + 1} of {len(granules)}: {granule}")
         gdf = gpd.read_parquet(f"{args.path_to_granules}/{granule}")
 
         # process each beam
