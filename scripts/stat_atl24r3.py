@@ -115,6 +115,8 @@ result = {
 
 try:
     # read granule into GeoDataFrames
+    if "ATL03" in granule: # convert to ATL24 granule name
+        granule = granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.parquet")
     result["messages"].append(f"Processing {granule}")
     gdf = gpd.read_parquet(f"s3://sliderule-public/atl24r3/parquet/{granule}")
 
