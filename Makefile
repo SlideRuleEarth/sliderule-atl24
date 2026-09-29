@@ -12,6 +12,7 @@ PROJECT_FOLDER = cf
 AWS_REGION = us-west-2
 MAKECFG ?= -DCMAKE_CXX_COMPILER=gcc14-g++
 USERCFG ?=
+CYCLE ?=
 
 all:
 	make -j8 -C $(BUILD)
@@ -89,10 +90,15 @@ test-local-run: install
 test-vset-run:
 	sliderule-runner submit atl24r3_vset scripts/gen_atl24r3.lua data/atl24r3_validation_set.txt --image sliderule:atl24
 
-CYCLE ?=
-platinum-run:
+platinum-run: # needs CYCLE
 	python scripts/gen_cycle_dataset.py $(CYCLE)
 	sliderule-runner submit atl24r3_cycle_$(CYCLE) scripts/gen_atl24r3.lua data/atl03_granules_cycle_$(CYCLE).txt --image sliderule:atl24
+
+platinum-stat: # needs CYCLE
+	sliderule-runner scrape --status success --name atl24r3_cycle_$(CYCLE)_0 --output /tmp/atl24_granules_cycle_$(CYCLE)_0.txt
+	sliderule-runner scrape --status success --name atl24r3_cycle_$(CYCLE)_10000 --output /tmp/atl24_granules_cycle_$(CYCLE)_10000.txt
+	cat /tmp/atl24_granules_cycle_$(CYCLE)_0.txt /tmp/atl24_granules_cycle_$(CYCLE)_10000.txt > data/atl24_granules_cycle_$(CYCLE).txt
+	sliderule-runner submit atl24r3_stat_cycle_$(CYCLE) scripts/stat1_atl24r3.py data/atl24_granules_cycle_$(CYCLE).txt --vcpus 1 --memory 8000 --image pysr:unstable
 
 clean:
 	- make -C $(BUILD) clean

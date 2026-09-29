@@ -1,24 +1,19 @@
-import os
 import sys
+import time
+import json
 import boto3
-import argparse
+import numpy as np
 import geopandas as gpd
 from sliderule import icesat2
 
-#
-# Command Line Arguments
-#
-parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
-parser.add_argument('--summary_file',       type=str,   default="/data/ATL24/atl24_v3_granule_collection.csv")
-parser.add_argument('--path_to_granules',   type=str,   default="s3://sliderule-public/atl24r3/parquet")
+# arguments
+granule = sys.argv[1]
+result_file = sys.argv[-1]
 
-args = parser.parse_args()
-
-#
-# Globals
-#
+# globals
 s3 = boto3.client("s3")
 
+# list of beams
 BEAMS = [
     "gt1l",
     "gt1r",
@@ -28,6 +23,7 @@ BEAMS = [
     "gt3r"
 ]
 
+# beams to ground track lookup table
 BEAM_TO_GT = {
     "gt1l": icesat2.GT1L,
     "gt1r": icesat2.GT1R,
@@ -37,71 +33,22 @@ BEAM_TO_GT = {
     "gt3r": icesat2.GT3R
 }
 
-#
-# Display Raw
-#
-def display(s):
-    sys.stdout.write(s)
-    sys.stdout.flush()
+# handle serializing numpy types
+def np_default(o):
+    if isinstance(o, np.generic): # np.int64, np.float32, np.bool_, ...
+        return o.item()
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
-#
-# Parse URL into Bucket and Subfolder
-#
+# parse URL into bucket and subfolder
 def parse_url(url):
     path = url.split("s3://")[-1]
     bucket = path.split("/")[0]
     subfolder = '/'.join(path.split("/")[1:])
     return bucket, subfolder
 
-#
-# List S3 Bucket
-#
-def list_bucket(url):
-    resources = []
-    bucket, subfolder = parse_url(url)
-    is_truncated = True
-    continuation_token = None
-    while is_truncated:
-        if continuation_token: response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder, ContinuationToken=continuation_token)
-        else: response = s3.list_objects_v2(Bucket=bucket, Prefix=subfolder)
-        display("#")
-        # parse contents
-        if 'Contents' in response:
-            for obj in response['Contents']:
-                resources.append(obj['Key'].split("/")[-1])
-        # check if more data is available
-        is_truncated = response['IsTruncated']
-        continuation_token = response.get('NextContinuationToken')
-    display(f"\nFound {len(resources)} resources\n")
-    return resources
-
-#
-# Write CSV File
-#
-def write_csv_file(filename, summary):
-    df = gpd.pd.DataFrame(summary)
-    df.to_csv(filename, index=False)
-
-#
-# Read CSV File
-#
-def read_csv_file(filename, row):
-    if os.path.exists(filename):
-        summary = gpd.pd.read_csv(filename)
-        return summary.to_dict('list')
-    else:
-        return {key: [] for key in row}
-
-#
-# Set Row
-#
-def set_row(summary, row):
-    for key in row:
-        summary[key].append(row[key])
-
-#
-# Get Initialized Row
-#
+# get initialized row
 def get_initialized_row(granule=None, beam=None):
     return {
         "granule": granule,
@@ -157,93 +104,95 @@ def get_initialized_row(granule=None, beam=None):
         "sea_surface_std": 0
     }
 
-#
-# Main
-#
-if __name__ == "__main__":
+# initialize result
+result = {
+    "status": True,
+    "build": "local",
+    "start": time.time(),
+    "outputs": [],
+    "messages": []
+}
 
-    # read current summary
-    summary = read_csv_file(args.summary_file, get_initialized_row())
+try:
+    # read granule into GeoDataFrames
+    result["messages"].append(f"Processing {granule}")
+    gdf = gpd.read_parquet(f"s3://sliderule-public/atl24r3/parquet/{granule}")
 
-    # get list of granules to process
-    granules_in_s3 = list_bucket(args.path_to_granules)
-    granules = [granule for granule in granules_in_s3 if granule not in summary["granule"]]
+    # process each beam
+    for beam in BEAMS:
 
-    # process each granule
-    for i in range(len(granules)):
-        granule = granules[i]
+        # get row for beam all set to zeros
+        row = get_initialized_row(granule, beam)
 
-        # read granule into GeoDataFrames
-        print(f"Processing file {i + 1} of {len(granules)}: {granule}")
-        gdf = gpd.read_parquet(f"{args.path_to_granules}/{granule}")
+        # perform initial analysis on dataframe
+        gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
+        beam_gdf = gdf[gdf["gt"] == BEAM_TO_GT[beam]]
+        class_ph_counts = beam_gdf["class_ph"].value_counts()
+        quality_ph_counts = beam_gdf["quality_ph"].value_counts()
+        bathy_gdf = beam_gdf[beam_gdf["class_ph"] == 40]
+        bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
 
-        # process each beam
-        for beam in BEAMS:
+        # set row elements
+        row["photons"] = len(beam_gdf)
+        row["subaqueous"] = (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h']).sum()
 
-            # get row for beam all set to zeros
-            row = get_initialized_row(granule, beam)
+        row["class_bathymetry"] = class_ph_counts.get(40, 0)
+        row["class_sea_surface"] = class_ph_counts.get(41, 0)
+        row["class_noise"] = class_ph_counts.get(0, 0)
+        row["class_idk"] = class_ph_counts.get(1, 0)
+        row["class_ground"] = class_ph_counts.get(2, 0)
 
-            # perform initial analysis on dataframe
-            gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
-            beam_gdf = gdf[gdf["gt"] == BEAM_TO_GT[beam]]
-            class_ph_counts = beam_gdf["class_ph"].value_counts()
-            quality_ph_counts = beam_gdf["quality_ph"].value_counts()
-            bathy_gdf = beam_gdf[beam_gdf["class_ph"] == 40]
-            bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
+        row["quality_nominal"] = quality_ph_counts.get(0,0)
+        row["quality_afterpulse"] = quality_ph_counts.get(1,0)
+        row["quality_impulse"] = quality_ph_counts.get(2,0)
+        row["quality_tep"] = quality_ph_counts.get(3,0)
+        row["quality_burst"] = quality_ph_counts.get(4,0)
+        row["quality_streak"] = quality_ph_counts.get(5,0)
+        row["quality_part"] = quality_ph_counts.get(10,0)
+        row["quality_part_afterpulse"] = quality_ph_counts.get(11,0)
+        row["quality_part_ir"] = quality_ph_counts.get(12,0)
+        row["quality_part_burst"] = quality_ph_counts.get(14,0)
+        row["quality_part_streak"] = quality_ph_counts.get(15,0)
+        row["quality_full"] = quality_ph_counts.get(20,0)
+        row["quality_full_afterpulse"] = quality_ph_counts.get(21,0)
+        row["quality_full_ir"] = quality_ph_counts.get(22,0)
+        row["quality_full_burst"] = quality_ph_counts.get(24,0)
+        row["quality_full_streak"] = quality_ph_counts.get(25,0)
 
-            # set row elements
-            row["photons"] = len(beam_gdf)
-            row["subaqueous"] = (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h']).sum()
+        row["bathy_quality_nominal"] = bathy_quality_ph_counts.get(0,0)
+        row["bathy_quality_afterpulse"] = bathy_quality_ph_counts.get(1,0)
+        row["bathy_quality_impulse"] = bathy_quality_ph_counts.get(2,0)
+        row["bathy_quality_tep"] = bathy_quality_ph_counts.get(3,0)
+        row["bathy_quality_burst"] = bathy_quality_ph_counts.get(4,0)
+        row["bathy_quality_streak"] = bathy_quality_ph_counts.get(5,0)
+        row["bathy_quality_part"] = bathy_quality_ph_counts.get(10,0)
+        row["bathy_quality_part_afterpulse"] = bathy_quality_ph_counts.get(11,0)
+        row["bathy_quality_part_ir"] = bathy_quality_ph_counts.get(12,0)
+        row["bathy_quality_part_burst"] = bathy_quality_ph_counts.get(14,0)
+        row["bathy_quality_part_streak"] = bathy_quality_ph_counts.get(15,0)
+        row["bathy_quality_full"] = bathy_quality_ph_counts.get(20,0)
+        row["bathy_quality_full_afterpulse"] = bathy_quality_ph_counts.get(21,0)
+        row["bathy_quality_full_ir"] = bathy_quality_ph_counts.get(22,0)
+        row["bathy_quality_full_burst"] = bathy_quality_ph_counts.get(24,0)
+        row["bathy_quality_full_streak"] = bathy_quality_ph_counts.get(25,0)
 
-            row["class_bathymetry"] = class_ph_counts.get(40, 0)
-            row["class_sea_surface"] = class_ph_counts.get(41, 0)
-            row["class_noise"] = class_ph_counts.get(0, 0)
-            row["class_idk"] = class_ph_counts.get(1, 0)
-            row["class_ground"] = class_ph_counts.get(2, 0)
+        row["bathy_depth_mean"] = bathy_gdf["depth"].mean()
+        row["bathy_depth_min"] = bathy_gdf["depth"].min()
+        row["bathy_depth_max"] = bathy_gdf["depth"].max()
+        row["bathy_depth_std"] = bathy_gdf["depth"].std()
+        row["sea_surface_std"] = bathy_gdf["surface_h"].std()
 
-            row["quality_nominal"] = quality_ph_counts.get(0,0)
-            row["quality_afterpulse"] = quality_ph_counts.get(1,0)
-            row["quality_impulse"] = quality_ph_counts.get(2,0)
-            row["quality_tep"] = quality_ph_counts.get(3,0)
-            row["quality_burst"] = quality_ph_counts.get(4,0)
-            row["quality_streak"] = quality_ph_counts.get(5,0)
-            row["quality_part"] = quality_ph_counts.get(10,0)
-            row["quality_part_afterpulse"] = quality_ph_counts.get(11,0)
-            row["quality_part_ir"] = quality_ph_counts.get(12,0)
-            row["quality_part_burst"] = quality_ph_counts.get(14,0)
-            row["quality_part_streak"] = quality_ph_counts.get(15,0)
-            row["quality_full"] = quality_ph_counts.get(20,0)
-            row["quality_full_afterpulse"] = quality_ph_counts.get(21,0)
-            row["quality_full_ir"] = quality_ph_counts.get(22,0)
-            row["quality_full_burst"] = quality_ph_counts.get(24,0)
-            row["quality_full_streak"] = quality_ph_counts.get(25,0)
+        # add row
+        result["messages"].append(f"Adding {beam} with {row["photons"]} photons to result")
+        result[beam] = row
 
-            row["bathy_quality_nominal"] = bathy_quality_ph_counts.get(0,0)
-            row["bathy_quality_afterpulse"] = bathy_quality_ph_counts.get(1,0)
-            row["bathy_quality_impulse"] = bathy_quality_ph_counts.get(2,0)
-            row["bathy_quality_tep"] = bathy_quality_ph_counts.get(3,0)
-            row["bathy_quality_burst"] = bathy_quality_ph_counts.get(4,0)
-            row["bathy_quality_streak"] = bathy_quality_ph_counts.get(5,0)
-            row["bathy_quality_part"] = bathy_quality_ph_counts.get(10,0)
-            row["bathy_quality_part_afterpulse"] = bathy_quality_ph_counts.get(11,0)
-            row["bathy_quality_part_ir"] = bathy_quality_ph_counts.get(12,0)
-            row["bathy_quality_part_burst"] = bathy_quality_ph_counts.get(14,0)
-            row["bathy_quality_part_streak"] = bathy_quality_ph_counts.get(15,0)
-            row["bathy_quality_full"] = bathy_quality_ph_counts.get(20,0)
-            row["bathy_quality_full_afterpulse"] = bathy_quality_ph_counts.get(21,0)
-            row["bathy_quality_full_ir"] = bathy_quality_ph_counts.get(22,0)
-            row["bathy_quality_full_burst"] = bathy_quality_ph_counts.get(24,0)
-            row["bathy_quality_full_streak"] = bathy_quality_ph_counts.get(25,0)
+except Exception as e:
 
-            row["bathy_depth_mean"] = bathy_gdf["depth"].mean()
-            row["bathy_depth_min"] = bathy_gdf["depth"].min()
-            row["bathy_depth_max"] = bathy_gdf["depth"].max()
-            row["bathy_depth_std"] = bathy_gdf["depth"].std()
-            row["sea_surface_std"] = bathy_gdf["surface_h"].std()
+    # errors
+    result["status"] = False
+    result["messages"].append(f"Unhandled exception: {e}")
 
-            # add row
-            print(f"... adding {beam} with {row["photons"]} photons to summary")
-            set_row(summary, row)
-
-    # write out summary
-    write_csv_file(args.summary_file, summary)
+# finish
+result["stop"] = time.time()
+with open(result_file, "w") as file:
+    json.dump(result, file, default=np_default)
