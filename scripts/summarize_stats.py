@@ -13,7 +13,7 @@ try:
 
     parser = argparse.ArgumentParser(description="""sliderule python job runner""")
     parser.add_argument('--result_output',  type=str,   default="/tmp/summary.txt")
-    parser.add_argument('--summary_file',   type=str,   default="/tmp/atl24_v3_granule_collection.csv")
+    parser.add_argument('--summary_file',   type=str,   default="data/atl24_v3_granule_collection.csv")
     args = parser.parse_args()
 
     # ########################
