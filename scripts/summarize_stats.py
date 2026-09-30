@@ -4,86 +4,96 @@ import traceback
 import argparse
 import boto3
 import pandas as pd
+from concurrent.futures import as_completed, ThreadPoolExecutor
 
-try:
+# ########################
+# Command Line Arguments
+# ########################
 
-    # ########################
-    # Command Line Arguments
-    # ########################
+parser = argparse.ArgumentParser(description="""sliderule python job runner""")
+parser.add_argument('--result_output',  type=str,               default="/tmp/summary.txt")
+parser.add_argument('--summary_file',   type=str,               default="/data/ATL24/atl24_v3_granule_collection.csv")
+parser.add_argument('--fresh_start',    action='store_true',    default=False) # overwrites summary_file
+parser.add_argument('--concurrency',    type=int,               default=20)
+args = parser.parse_args()
 
-    parser = argparse.ArgumentParser(description="""sliderule python job runner""")
-    parser.add_argument('--result_output',  type=str,   default="/tmp/summary.txt")
-    parser.add_argument('--summary_file',   type=str,   default="data/atl24_v3_granule_collection.csv")
-    args = parser.parse_args()
+# ########################
+# Globals
+# ########################
 
-    # ########################
-    # Globals
-    # ########################
+s3 = boto3.client("s3")
 
-    s3 = boto3.client("s3")
+BEAMS = [
+    "gt1l",
+    "gt1r",
+    "gt2l",
+    "gt2r",
+    "gt3l",
+    "gt3r"
+]
 
-    BEAMS = [
-        "gt1l",
-        "gt1r",
-        "gt2l",
-        "gt2r",
-        "gt3l",
-        "gt3r"
-    ]
+# ########################
+# Helper Functions
+# ########################
 
-    # ########################
-    # Helper Functions
-    # ########################
+def parse_url(url):
+    path = url.split("s3://")[-1]
+    bucket = path.split("/")[0]
+    key = '/'.join(path.split("/")[1:])
+    return bucket, key
 
-    def parse_url(url):
-        path = url.split("s3://")[-1]
-        bucket = path.split("/")[0]
-        key = '/'.join(path.split("/")[1:])
-        return bucket, key
+def load_remote_file(url):
+    bucket, key = parse_url(url)
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    contents = obj["Body"].read().decode("utf-8")
+    try:
+        return json.loads(contents)
+    except Exception:
+        return contents
 
-    def load_remote_file(url):
-        bucket, key = parse_url(url)
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        contents = obj["Body"].read().decode("utf-8")
-        try:
-            return json.loads(contents)
-        except Exception:
-            return contents
+def add_result(summary, result):
+    if not summary:
+        if not args.fresh_start and os.path.exists(args.summary_file):
+            summary = pd.read_csv(args.summary_file)
+            summary = summary.to_dict('list')
+        else:
+            summary = {key: [] for key in result}
+    for key in result:
+        summary[key].append(result[key])
+    return summary
 
-    def add_result(summary, result):
-        if not summary:
-            if os.path.exists(args.summary_file):
-                summary = pd.read_csv(args.summary_file)
-                summary = summary.to_dict('list')
-            else:
-                summary = {key: [] for key in result}
-        for key in result:
-            summary[key].append(result[key])
-        return summary
+def write_csv_file(summary, filename):
+    df = pd.DataFrame(summary)
+    df.to_csv(filename, index=False)
 
-    def write_csv_file(summary, filename):
-        df = pd.DataFrame(summary)
-        df.to_csv(filename, index=False)
+# ########################
+# Main
+# ########################
 
-    # ########################
-    # Main
-    # ########################
-
-    summary = {}
-    for line in open(args.result_output, "r"):
-        output = json.loads(line)
+# worker thread
+def worker(output):
+    try:
         if output["status"] == "success":
-            result = load_remote_file(f"s3://sliderule-public/{output['file']}")
-            for beam in BEAMS:
-                if beam in result:
-                    summary = add_result(summary, result[beam])
-    write_csv_file(summary, args.summary_file)
+            return load_remote_file(f"s3://{output['file']}")
+    except Exception as e:
+        print(f"Unhandled exception: {e}")
+        traceback.print_exc()
 
-except Exception as e:
+# read in outputs to process
+outputs = [json.loads(line) for line in open(args.result_output, "r") if line.strip()]
 
-    # ########################
-    # Errors
-    # ########################
+# execute workers to build summary
+summary = {}
+with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+    futures = [executor.submit(worker, output) for output in outputs]
+    for future in as_completed(futures):
+        result = future.result()
+        granule = "empty"
+        for beam in BEAMS:
+            if beam in result:
+                summary = add_result(summary, result[beam])
+                granule = result[beam]["granule"]
+        print(f"Added {granule}")
 
-    print(f"Unhandled exception: {e}")
-    traceback.print_exc()
+# write summary out to csv
+write_csv_file(summary, args.summary_file)

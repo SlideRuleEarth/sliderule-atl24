@@ -101,10 +101,10 @@ platinum-stat: # needs CYCLE
 	sliderule-runner submit atl24r3_stat_cycle_$(CYCLE) scripts/stat_atl24r3.py data/atl24_granules_cycle_$(CYCLE).txt --vcpus 1 --memory 8000 --image pysr:unstable
 
 platinum-summarize: # needs CYCLE
-	sliderule-runner scrape --name atl24r3_cycle_$(CYCLE)_0 --verbose --status success --output /tmp/result_output_$(CYCLE)_0.txt
-	sliderule-runner scrape --name atl24r3_cycle_$(CYCLE)_10000 --verbose --status success --output /tmp/result_output_$(CYCLE)_10000.txt
-	cat /tmp/result_output_$(CYCLE)_0.txt /tmp/result_output_$(CYCLE)_10000.txt > /tmp/result_output_$(CYCLE).txt
-	python scripts/summarize_stats.py --result_output /tmp/result_output_$(CYCLE).txt
+	sliderule-runner scrape --name atl24r3_stat_cycle_$(CYCLE)_0 --verbose --status success --output /tmp/atl24_stat_cycle_$(CYCLE)_0.txt
+	sliderule-runner scrape --name atl24r3_stat_cycle_$(CYCLE)_10000 --verbose --status success --output /tmp/atl24_stat_cycle_$(CYCLE)_10000.txt
+	cat /tmp/atl24_stat_cycle_$(CYCLE)_0.txt /tmp/atl24_stat_cycle_$(CYCLE)_10000.txt > /tmp/atl24_stat_cycle_$(CYCLE).txt
+	python scripts/summarize_stats.py --result_output /tmp/atl24_stat_cycle_$(CYCLE).txt
 
 clean:
 	- make -C $(BUILD) clean
