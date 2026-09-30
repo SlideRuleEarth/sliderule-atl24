@@ -74,7 +74,7 @@ def write_csv_file(summary, filename):
 def worker(output):
     try:
         if output["status"] == "success":
-            return load_remote_file(f"s3://{output['file']}")
+            return load_remote_file(output['file'])
     except Exception as e:
         print(f"Unhandled exception: {e}")
         traceback.print_exc()
