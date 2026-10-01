@@ -133,8 +133,8 @@ try:
 
     # Get granules to process
     all_available_granules = args.granule and [args.granule] or list_bucket()
-    granules_to_process = [granule for granule in all_available_granules if (granule in cache and cache[granule]["status"] != Status.TX_INITIATED)]
-    print(f"Preparing to transfer {len(granules_to_process)} granule(s)")
+    granules_to_process = [granule for granule in all_available_granules if (granule not in cache or cache[granule]["status"] != Status.TX_INITIATED)]
+    print(f"Preparing to transfer {len(granules_to_process)} granule(s) out of {len(all_available_granules)} granule(s)")
 
     # Get attributes for each granule to process
     for i in range(len(granules_to_process)):
@@ -144,8 +144,8 @@ try:
             sys.stdout.flush()
         try:
             cache[granule] = {
-                "h5": get_attributes(f"{granule}.h5"),
-                "xml": get_attributes(f"{granule}.iso.xml"),
+                "h5": get_attributes(granule),
+                "xml": get_attributes(granule.replace(".h5", ".iso.xml")),
                 "status": Status.TX_READY
             }
         except Exception as e:
@@ -194,24 +194,24 @@ try:
                 "provider": provider,
                 "responseStreamArn": response_stream_arn,
                 "product": {
-                    "name": cache[granule]["attributes"]["h5"]["name"],
+                    "name": cache[granule]["h5"]["name"],
                     "dataVersion": args.data_version,
                     "files": [
                         {
-                            "name": cache[granule]["attributes"]["xml"]["name"],
+                            "name": cache[granule]["xml"]["name"],
                             "type": "metadata",
-                            "uri": cache[granule]["attributes"]["xml"]["path"],
+                            "uri": cache[granule]["xml"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": cache[granule]["attributes"]["xml"]["checksum"],
-                            "size": cache[granule]["attributes"]["xml"]["size"],
+                            "checksum": cache[granule]["xml"]["checksum"],
+                            "size": cache[granule]["xml"]["size"],
                         },
                         {
-                            "name": cache[granule]["attributes"]["h5"]["name"],
+                            "name": cache[granule]["h5"]["name"],
                             "type": "data",
-                            "uri": cache[granule]["attributes"]["h5"]["path"],
+                            "uri": cache[granule]["h5"]["path"],
                             "checksumType": "SHA256",
-                            "checksum": cache[granule]["attributes"]["h5"]["checksum"],
-                            "size": cache[granule]["attributes"]["h5"]["size"],
+                            "checksum": cache[granule]["h5"]["checksum"],
+                            "size": cache[granule]["h5"]["size"],
                         }
                     ]
                 }

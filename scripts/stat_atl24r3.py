@@ -8,7 +8,7 @@ from sliderule import icesat2
 
 # arguments
 granule = sys.argv[1]
-result_file = sys.argv[-1]
+result_file = sys.argv[2]
 
 # globals
 s3 = boto3.client("s3")
