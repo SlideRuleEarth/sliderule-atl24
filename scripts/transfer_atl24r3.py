@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 # Command Line Arguments
 parser = argparse.ArgumentParser(description="""ATL24 Platinum Run""")
 parser.add_argument('--stage',          type=str,               default="s3://sliderule/data/ATL24r3")
-parser.add_argument('--cache',          type=str,               default="data/atl24r3_cache.json")
+parser.add_argument('--cache',          type=str,               default="/data/ATL24/atl24r3_cache.json")
 parser.add_argument('--data_version',   type=str,               default="003")
 parser.add_argument('--transfer',       type=int,               default=0) # must provide in order to actually transfer
 parser.add_argument('--batch_size',     type=int,               default=100, choices=range(1, 501))
