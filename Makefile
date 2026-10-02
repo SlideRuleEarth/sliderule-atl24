@@ -49,7 +49,7 @@ tag:
 	git push --tags && git push
 	gh release create $(VERSION) -t $(VERSION) --notes "see https://slideruleearth.io for details"
 
-release: distclean tag config-stage-release all
+release: distclean tag docker-atl24 docker-atl24-push
 
 docker-atl24:
 	-rm -Rf $(STAGE)
