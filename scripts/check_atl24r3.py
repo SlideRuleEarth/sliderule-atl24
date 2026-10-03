@@ -26,8 +26,8 @@ nsidc_creds = auth.get_s3_credentials(daac="NSIDC")
 # Constants
 #
 VERSIONS = {
-    "sliderule_version":    "v5.6.1",
-    "atl24_plugin_version": "v3.1.0",
+    "sliderule_version":    "v5.6.3",
+    "atl24_plugin_version": "v3.1.2",
     "alt24_algo_version":   "eca4bf8"
 }
 
