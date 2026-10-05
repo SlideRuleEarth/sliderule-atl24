@@ -3,7 +3,9 @@ import time
 import json
 import boto3
 import numpy as np
+import shapely
 import geopandas as gpd
+from shapely.affinity import scale
 from sliderule import icesat2
 
 # arguments
@@ -33,6 +35,12 @@ BEAM_TO_GT = {
     "gt3r": icesat2.GT3R
 }
 
+# season map[is_north][month] --> 0: winter, 1: spring, 2: summer, 3: fall
+MONTH_TO_SEASON = {
+    True: { 1: 0, 2: 0, 3: 0, 4: 1, 5: 1, 6: 1, 7: 2, 8: 2, 9: 2, 10: 3, 11: 3, 12: 3 },
+    False: { 1: 2, 2: 2, 3: 2, 4: 3, 5: 3, 6: 3, 7: 0, 8: 0, 9: 0, 10: 1, 11: 1, 12: 1 }
+}
+
 # handle serializing numpy types
 def np_default(o):
     if isinstance(o, np.generic): # np.int64, np.float32, np.bool_, ...
@@ -47,62 +55,6 @@ def parse_url(url):
     bucket = path.split("/")[0]
     subfolder = '/'.join(path.split("/")[1:])
     return bucket, subfolder
-
-# get initialized row
-def get_initialized_row(granule=None, beam=None):
-    return {
-        "granule": granule,
-        "beam": beam,
-
-        "photons": 0,
-        "subaqueous": 0,
-
-        "class_bathymetry": 0,                  # 40
-        "class_sea_surface": 0,                 # 41
-        "class_noise": 0,                       # 0
-        "class_idk": 0,                         # 1
-        "class_ground": 0,                      # 2
-
-        "quality_nominal": 0,                   # 0
-        "quality_afterpulse": 0,                # 1
-        "quality_impulse": 0,                   # 2
-        "quality_tep": 0,                       # 3
-        "quality_burst": 0,                     # 4
-        "quality_streak": 0,                    # 5
-        "quality_part": 0,                      # 10
-        "quality_part_afterpulse": 0,           # 11
-        "quality_part_ir": 0,                   # 12
-        "quality_part_burst": 0,                # 14
-        "quality_part_streak": 0,               # 15
-        "quality_full": 0,                      # 20
-        "quality_full_afterpulse": 0,           # 21
-        "quality_full_ir": 0,                   # 22
-        "quality_full_burst": 0,                # 24
-        "quality_full_streak": 0,               # 25
-
-        "bathy_quality_nominal": 0,             # 0
-        "bathy_quality_afterpulse": 0,          # 1
-        "bathy_quality_impulse": 0,             # 2
-        "bathy_quality_tep": 0,                 # 3
-        "bathy_quality_burst": 0,               # 4
-        "bathy_quality_streak": 0,              # 5
-        "bathy_quality_part": 0,                # 10
-        "bathy_quality_part_afterpulse": 0,     # 11
-        "bathy_quality_part_ir": 0,             # 12
-        "bathy_quality_part_burst": 0,          # 14
-        "bathy_quality_part_streak": 0,         # 15
-        "bathy_quality_full": 0,                # 20
-        "bathy_quality_full_afterpulse": 0,     # 21
-        "bathy_quality_full_ir": 0,             # 22
-        "bathy_quality_full_burst": 0,          # 24
-        "bathy_quality_full_streak": 0,         # 25
-
-        "bathy_depth_mean": 0,
-        "bathy_depth_min": 0,
-        "bathy_depth_max": 0,
-        "bathy_depth_std": 0,
-        "sea_surface_std": 0
-    }
 
 # initialize result
 result = {
@@ -120,11 +72,22 @@ try:
     result["messages"].append(f"Processing {granule}")
     gdf = gpd.read_parquet(f"s3://sliderule-public/atl24r3/parquet/{granule}")
 
+    # granule orbit stats
+    month = int(granule[10:12])
+    region = int(granule[27:29])
+
+    # get polygon
+    hull = gdf.geometry.union_all().convex_hull
+    buffers = []
+    for lon, lat in shapely.get_coordinates(hull):
+        lon_scale = 1.0 / max(np.cos(np.radians(lat)), 0.01)
+        circle = shapely.Point(lon, lat).buffer(0.01)
+        buffers.append(scale(circle, xfact=lon_scale, yfact=1.0, origin=(lon, lat)))
+    poly = shapely.GeometryCollection(buffers).convex_hull.simplify(0.005)
+    poly_str = ' '.join([f'{x:.6f} {y:.6f}' for x, y in poly.exterior.coords])
+
     # process each beam
     for beam in BEAMS:
-
-        # get row for beam all set to zeros
-        row = get_initialized_row(granule, beam)
 
         # perform initial analysis on dataframe
         gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
@@ -133,56 +96,61 @@ try:
         quality_ph_counts = beam_gdf["quality_ph"].value_counts()
         bathy_gdf = beam_gdf[beam_gdf["class_ph"] == 40]
         bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
+        sea_surface_gdf = beam_gdf[beam_gdf["class_ph"] == 41]
+        subaqueous_gdf = beam_gdf[beam_gdf["class_ph"].isin([0, 1, 40]) & (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h'])]
 
         # set row elements
-        row["photons"] = len(beam_gdf)
-        row["subaqueous"] = (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h']).sum()
+        row = {
+            "granule":                  granule,
+            "beam":                     beam,
+            "region":                   region,
+            "season":                   MONTH_TO_SEASON[region<8][month],
 
-        row["class_bathymetry"] = class_ph_counts.get(40, 0)
-        row["class_sea_surface"] = class_ph_counts.get(41, 0)
-        row["class_noise"] = class_ph_counts.get(0, 0)
-        row["class_idk"] = class_ph_counts.get(1, 0)
-        row["class_ground"] = class_ph_counts.get(2, 0)
+            "photons":                  len(beam_gdf),
+            "subaqueous":               len(subaqueous_gdf),
 
-        row["quality_nominal"] = quality_ph_counts.get(0,0)
-        row["quality_afterpulse"] = quality_ph_counts.get(1,0)
-        row["quality_impulse"] = quality_ph_counts.get(2,0)
-        row["quality_tep"] = quality_ph_counts.get(3,0)
-        row["quality_burst"] = quality_ph_counts.get(4,0)
-        row["quality_streak"] = quality_ph_counts.get(5,0)
-        row["quality_part"] = quality_ph_counts.get(10,0)
-        row["quality_part_afterpulse"] = quality_ph_counts.get(11,0)
-        row["quality_part_ir"] = quality_ph_counts.get(12,0)
-        row["quality_part_burst"] = quality_ph_counts.get(14,0)
-        row["quality_part_streak"] = quality_ph_counts.get(15,0)
-        row["quality_full"] = quality_ph_counts.get(20,0)
-        row["quality_full_afterpulse"] = quality_ph_counts.get(21,0)
-        row["quality_full_ir"] = quality_ph_counts.get(22,0)
-        row["quality_full_burst"] = quality_ph_counts.get(24,0)
-        row["quality_full_streak"] = quality_ph_counts.get(25,0)
+            "class_bathymetry":         class_ph_counts.get(40, 0),
+            "class_sea_surface":        class_ph_counts.get(41, 0),
+            "class_noise":              class_ph_counts.get(0, 0),
+            "class_idk":                class_ph_counts.get(1, 0),
+            "class_ground":             class_ph_counts.get(2, 0),
 
-        row["bathy_quality_nominal"] = bathy_quality_ph_counts.get(0,0)
-        row["bathy_quality_afterpulse"] = bathy_quality_ph_counts.get(1,0)
-        row["bathy_quality_impulse"] = bathy_quality_ph_counts.get(2,0)
-        row["bathy_quality_tep"] = bathy_quality_ph_counts.get(3,0)
-        row["bathy_quality_burst"] = bathy_quality_ph_counts.get(4,0)
-        row["bathy_quality_streak"] = bathy_quality_ph_counts.get(5,0)
-        row["bathy_quality_part"] = bathy_quality_ph_counts.get(10,0)
-        row["bathy_quality_part_afterpulse"] = bathy_quality_ph_counts.get(11,0)
-        row["bathy_quality_part_ir"] = bathy_quality_ph_counts.get(12,0)
-        row["bathy_quality_part_burst"] = bathy_quality_ph_counts.get(14,0)
-        row["bathy_quality_part_streak"] = bathy_quality_ph_counts.get(15,0)
-        row["bathy_quality_full"] = bathy_quality_ph_counts.get(20,0)
-        row["bathy_quality_full_afterpulse"] = bathy_quality_ph_counts.get(21,0)
-        row["bathy_quality_full_ir"] = bathy_quality_ph_counts.get(22,0)
-        row["bathy_quality_full_burst"] = bathy_quality_ph_counts.get(24,0)
-        row["bathy_quality_full_streak"] = bathy_quality_ph_counts.get(25,0)
+            "quality_nominal":          quality_ph_counts.get(0,0) + quality_ph_counts.get(10,0) + quality_ph_counts.get(20,0),
+            "quality_afterpulse":       quality_ph_counts.get(1,0) + quality_ph_counts.get(11,0) + quality_ph_counts.get(21,0),
+            "quality_impulse":          quality_ph_counts.get(2,0) + quality_ph_counts.get(12,0) + quality_ph_counts.get(22,0),
+            "quality_tep":              quality_ph_counts.get(3,0),
+            "quality_burst":            quality_ph_counts.get(4,0) + quality_ph_counts.get(14,0) + quality_ph_counts.get(24,0),
+            "quality_streak":           quality_ph_counts.get(5,0) + quality_ph_counts.get(15,0) + quality_ph_counts.get(25,0),
 
-        row["bathy_depth_mean"] = bathy_gdf["depth"].mean()
-        row["bathy_depth_min"] = bathy_gdf["depth"].min()
-        row["bathy_depth_max"] = bathy_gdf["depth"].max()
-        row["bathy_depth_std"] = bathy_gdf["depth"].std()
-        row["sea_surface_std"] = bathy_gdf["surface_h"].std()
+            "bathy_quality_nominal":    bathy_quality_ph_counts.get(0,0) + bathy_quality_ph_counts.get(10,0) + bathy_quality_ph_counts.get(20,0),
+            "bathy_quality_afterpulse": bathy_quality_ph_counts.get(1,0) + bathy_quality_ph_counts.get(11,0) + bathy_quality_ph_counts.get(21,0),
+            "bathy_quality_impulse":    bathy_quality_ph_counts.get(2,0) + bathy_quality_ph_counts.get(12,0) + bathy_quality_ph_counts.get(22,0),
+            "bathy_quality_tep":        bathy_quality_ph_counts.get(3,0),
+            "bathy_quality_burst":      bathy_quality_ph_counts.get(4,0) + bathy_quality_ph_counts.get(14,0) + bathy_quality_ph_counts.get(24,0),
+            "bathy_quality_streak":     bathy_quality_ph_counts.get(5,0) + bathy_quality_ph_counts.get(15,0) + bathy_quality_ph_counts.get(25,0),
+
+            "bathy_depth_mean":         bathy_gdf["depth"].mean(),
+            "bathy_depth_median":       bathy_gdf["depth"].median(),
+            "bathy_depth_min":          bathy_gdf["depth"].min(),
+            "bathy_depth_max":          bathy_gdf["depth"].max(),
+            "bathy_depth_std":          bathy_gdf["depth"].std(),
+
+            "surface_roughness_mean":   sea_surface_gdf["surface_roughness"].mean(),
+            "surface_roughness_median": sea_surface_gdf["surface_roughness"].median(),
+            "surface_roughness_min":    sea_surface_gdf["surface_roughness"].min(),
+            "surface_roughness_max":    sea_surface_gdf["surface_roughness"].max(),
+            "surface_roughness_std":    sea_surface_gdf["surface_roughness"].std(),
+
+            "kd_mean":                  subaqueous_gdf["kd"].mean(),
+            "kd_median":                subaqueous_gdf["kd"].median(),
+            "kd_min":                   subaqueous_gdf["kd"].min(),
+            "kd_max":                   subaqueous_gdf["kd"].max(),
+            "kd_std":                   subaqueous_gdf["kd"].std(),
+
+            "polygon":                  poly_str,
+            "begin_time":               extent["begin_time"],
+            "end_time":                 extent["end_time"]
+        }
 
         # add row
         result["messages"].append(f"Adding {beam} with {row["photons"]} photons to result")

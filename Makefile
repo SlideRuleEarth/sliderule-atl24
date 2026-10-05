@@ -94,6 +94,9 @@ platinum-run: # needs CYCLE
 	python scripts/gen_cycle_dataset.py $(CYCLE)
 	sliderule-runner submit atl24r3_cycle_$(CYCLE) scripts/gen_atl24r3.lua data/atl03_granules_cycle_$(CYCLE).txt --image sliderule:atl24
 
+platinum-check: # needs CYCLE
+	python scripts/check_atl24r3.py --atl03_granules data/atl03_granules_cycle_$(CYCLE).txt
+
 platinum-stat: # needs CYCLE
 	sliderule-runner scrape --status success --name atl24r3_cycle_$(CYCLE)_0 --output /tmp/atl24_granules_cycle_$(CYCLE)_0.txt
 	sliderule-runner scrape --status success --name atl24r3_cycle_$(CYCLE)_10000 --output /tmp/atl24_granules_cycle_$(CYCLE)_10000.txt
@@ -105,6 +108,11 @@ platinum-summarize: # needs CYCLE
 	sliderule-runner scrape --name atl24r3_stat_cycle_$(CYCLE)_10000 --verbose --status success --output /tmp/atl24_stat_cycle_$(CYCLE)_10000.txt
 	cat /tmp/atl24_stat_cycle_$(CYCLE)_0.txt /tmp/atl24_stat_cycle_$(CYCLE)_10000.txt > /tmp/atl24_stat_cycle_$(CYCLE).txt
 	python scripts/summarize_stats.py --result_output /tmp/atl24_stat_cycle_$(CYCLE).txt
+
+NUM_GRANULES ?= 0
+platinum-transfer: # needs NUM_GRANULES
+	scripts/sync_atl24r3.sh
+	python scripts/transfer_atl24r3.py --transfer $(NUM_GRANULES)
 
 clean:
 	- make -C $(BUILD) clean
