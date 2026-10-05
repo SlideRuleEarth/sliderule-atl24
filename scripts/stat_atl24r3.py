@@ -1,12 +1,14 @@
 import sys
 import time
 import json
+import traceback
 import boto3
 import numpy as np
 import pandas as pd
 import shapely
 import geopandas as gpd
 from shapely.affinity import scale
+from shapely.geometry.polygon import orient
 from sliderule import icesat2
 
 # arguments
@@ -94,21 +96,24 @@ result = {
 try:
     # read granule into GeoDataFrames
     result["messages"].append(f"Processing {granule}")
-    gdf = gpd.read_parquet(input_file)
+    gdf = gpd.read_parquet(input_file, columns=["geometry", "gt", "class_ph", "quality_ph", "surface_h", "geoid_corr_h", "x_atc", "kd", "surface_roughness"])
     gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
 
-    # get polygon
-    hull = gdf.geometry.union_all().convex_hull
+    # get polygon; longitudes are unwrapped in time order so antimeridian and polar crossings stay continuous (lon may exceed 180)
+    coords = shapely.get_coordinates(gdf.geometry.values)[np.argsort(gdf.index.values, kind="stable")]
+    coords[:, 0] = np.unwrap(coords[:, 0], period=360)
+    if coords[:, 0].min() < -180:
+        coords[:, 0] += 360
+    hull = shapely.multipoints(coords).convex_hull
     buffers = []
     for lon, lat in shapely.get_coordinates(hull):
         lon_scale = 1.0 / max(np.cos(np.radians(lat)), 0.01)
         circle = shapely.Point(lon, lat).buffer(0.01)
         buffers.append(scale(circle, xfact=lon_scale, yfact=1.0, origin=(lon, lat)))
-    poly = shapely.GeometryCollection(buffers).convex_hull.simplify(0.005)
+    poly = orient(shapely.GeometryCollection(buffers).convex_hull.simplify(0.005), sign=1.0)
     poly_str = ' '.join([f'{x:.6f} {y:.6f}' for x, y in poly.exterior.coords])
 
     # initialize output
-    grid = np.zeros((720, 1440), dtype=np.uint32)
     month = int(granule[10:12])
     region = int(granule[27:29])
     output = {
@@ -197,11 +202,11 @@ try:
     s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(json_safe(output), allow_nan=False), ContentType="application/json")
     result["outputs"].append(output_file)
 
-except Exception as e:
+except Exception:
 
     # errors
     result["status"] = False
-    result["messages"].append(f"Unhandled exception: {e}")
+    result["messages"].append(f"Unhandled exception: {traceback.format_exc()}")
 
 # finish
 result["stop"] = time.time()
