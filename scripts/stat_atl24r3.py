@@ -40,8 +40,8 @@ BEAM_TO_GT = {
 
 # season map[is_north][month] --> 0: winter, 1: spring, 2: summer, 3: fall
 MONTH_TO_SEASON = {
-    True: { 1: 0, 2: 0, 3: 0, 4: 1, 5: 1, 6: 1, 7: 2, 8: 2, 9: 2, 10: 3, 11: 3, 12: 3 },
-    False: { 1: 2, 2: 2, 3: 2, 4: 3, 5: 3, 6: 3, 7: 0, 8: 0, 9: 0, 10: 1, 11: 1, 12: 1 }
+    True: { 1: 0, 2: 0, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 2, 9: 3, 10: 3, 11: 3, 12: 0 },
+    False: { 1: 2, 2: 2, 3: 3, 4: 3, 5: 3, 6: 0, 7: 0, 8: 0, 9: 1, 10: 1, 11: 1, 12: 2 }
 }
 
 # along-track bin sizes (m) and invalid value used by atl24_v2_algorithms estimate_kd and estimate_surface_roughness
