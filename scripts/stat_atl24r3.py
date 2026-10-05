@@ -29,13 +29,13 @@ BEAMS = [
 ]
 
 # beams to ground track lookup table
-BEAM_TO_GT = {
-    "gt1l": icesat2.GT1L,
-    "gt1r": icesat2.GT1R,
-    "gt2l": icesat2.GT2L,
-    "gt2r": icesat2.GT2R,
-    "gt3l": icesat2.GT3L,
-    "gt3r": icesat2.GT3R
+GT_TO_BEAM = {
+    icesat2.GT1L: "gt1l",
+    icesat2.GT1R: "gt1r",
+    icesat2.GT2L: "gt2l",
+    icesat2.GT2R: "gt2r",
+    icesat2.GT3L: "gt3l",
+    icesat2.GT3R: "gt3r",
 }
 
 # season map[is_north][month] --> 0: winter, 1: spring, 2: summer, 3: fall
@@ -43,6 +43,9 @@ MONTH_TO_SEASON = {
     True: { 1: 0, 2: 0, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 2, 9: 3, 10: 3, 11: 3, 12: 0 },
     False: { 1: 2, 2: 2, 3: 3, 4: 3, 5: 3, 6: 0, 7: 0, 8: 0, 9: 1, 10: 1, 11: 1, 12: 2 }
 }
+
+# along-track segment sizes used in ATL03
+SEGMENT_SIZE = 20.0 # meters
 
 # along-track bin sizes (m) and invalid value used by atl24_v2_algorithms estimate_kd and estimate_surface_roughness
 KD_BIN_SIZE = 500
@@ -96,7 +99,7 @@ result = {
 try:
     # read granule into GeoDataFrames
     result["messages"].append(f"Processing {granule}")
-    gdf = gpd.read_parquet(input_file, columns=["geometry", "gt", "class_ph", "quality_ph", "surface_h", "geoid_corr_h", "x_atc", "kd", "surface_roughness"])
+    gdf = gpd.read_parquet(input_file, columns=["geometry", "gt", "spot", "index_seg", "class_ph", "quality_ph", "surface_h", "geoid_corr_h", "x_atc", "kd", "surface_roughness", "processing_flags", "ref_el", "confidence"])
     gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
 
     # get polygon; longitudes are unwrapped in time order so antimeridian and polar crossings stay continuous (lon may exceed 180)
@@ -128,67 +131,87 @@ try:
     }
 
     # process each beam
-    for beam in BEAMS:
+    for spot in [1, 2, 3, 4, 5, 6]:
 
-        # perform initial analysis on dataframe
-        beam_gdf = gdf[gdf["gt"] == BEAM_TO_GT[beam]]
-        class_ph_counts = beam_gdf["class_ph"].value_counts()
-        quality_ph_counts = beam_gdf["quality_ph"].value_counts()
-        bathy_gdf = beam_gdf[beam_gdf["class_ph"] == 40]
-        bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
-        sea_surface_gdf = beam_gdf[beam_gdf["class_ph"] == 41]
-        subaqueous_gdf = beam_gdf[beam_gdf["class_ph"].isin([0, 1, 40]) & (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h'])]
-        x0 = beam_gdf["x_atc"].min()
-        kd_bins = per_bin_values(subaqueous_gdf, "kd", x0, KD_BIN_SIZE)
-        roughness_bins = per_bin_values(sea_surface_gdf, "surface_roughness", x0, ROUGHNESS_BIN_SIZE)
+        # get dataframe of spot (track)
+        spot_gdf = gdf[gdf["spot"] == spot]
+        num_photons = len(spot_gdf)
+        if num_photons > 0:
+            result["messages"].append(f"Adding spot {spot} with {num_photons} photons to result")
 
-        # set beam elements
-        output[beam] = {
-            "beam":                     beam,
-            "photons":                  len(beam_gdf),
-            "subaqueous":               len(subaqueous_gdf),
+            # perform initial analysis on dataframe
+            class_ph_counts = spot_gdf["class_ph"].value_counts()
+            quality_ph_counts = spot_gdf["quality_ph"].value_counts()
+            bathy_gdf = spot_gdf[spot_gdf["class_ph"] == 40]
+            bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
+            bathy_unique_segments = len(bathy_gdf["index_seg"].unique())
+            sea_surface_gdf = spot_gdf[spot_gdf["class_ph"] == 41]
+            subaqueous_gdf = spot_gdf[spot_gdf["class_ph"].isin([0, 1, 40]) & (spot_gdf['geoid_corr_h'] < spot_gdf['surface_h'])]
+            x0 = spot_gdf["x_atc"].min()
+            kd_bins = per_bin_values(subaqueous_gdf, "kd", x0, KD_BIN_SIZE)
+            roughness_bins = per_bin_values(sea_surface_gdf, "surface_roughness", x0, ROUGHNESS_BIN_SIZE)
 
-            "class_bathymetry":         class_ph_counts.get(40, 0),
-            "class_sea_surface":        class_ph_counts.get(41, 0),
-            "class_noise":              class_ph_counts.get(0, 0),
-            "class_idk":                class_ph_counts.get(1, 0),
-            "class_ground":             class_ph_counts.get(2, 0),
+            # set spot elements
+            output[spot] = {
+                "beam":                     GT_TO_BEAM[int(spot_gdf.iloc[0]["gt"])],
+                "photons":                  len(spot_gdf),
+                "subaqueous":               len(subaqueous_gdf),
 
-            "quality_nominal":          quality_ph_counts.get(0,0) + quality_ph_counts.get(10,0) + quality_ph_counts.get(20,0),
-            "quality_afterpulse":       quality_ph_counts.get(1,0) + quality_ph_counts.get(11,0) + quality_ph_counts.get(21,0),
-            "quality_impulse":          quality_ph_counts.get(2,0) + quality_ph_counts.get(12,0) + quality_ph_counts.get(22,0),
-            "quality_tep":              quality_ph_counts.get(3,0),
-            "quality_burst":            quality_ph_counts.get(4,0) + quality_ph_counts.get(14,0) + quality_ph_counts.get(24,0),
-            "quality_streak":           quality_ph_counts.get(5,0) + quality_ph_counts.get(15,0) + quality_ph_counts.get(25,0),
+                "class_bathymetry":         class_ph_counts.get(40, 0),
+                "class_sea_surface":        class_ph_counts.get(41, 0),
+                "class_noise":              class_ph_counts.get(0, 0),
+                "class_idk":                class_ph_counts.get(1, 0),
+                "class_ground":             class_ph_counts.get(2, 0),
 
-            "bathy_quality_nominal":    bathy_quality_ph_counts.get(0,0) + bathy_quality_ph_counts.get(10,0) + bathy_quality_ph_counts.get(20,0),
-            "bathy_quality_afterpulse": bathy_quality_ph_counts.get(1,0) + bathy_quality_ph_counts.get(11,0) + bathy_quality_ph_counts.get(21,0),
-            "bathy_quality_impulse":    bathy_quality_ph_counts.get(2,0) + bathy_quality_ph_counts.get(12,0) + bathy_quality_ph_counts.get(22,0),
-            "bathy_quality_tep":        bathy_quality_ph_counts.get(3,0),
-            "bathy_quality_burst":      bathy_quality_ph_counts.get(4,0) + bathy_quality_ph_counts.get(14,0) + bathy_quality_ph_counts.get(24,0),
-            "bathy_quality_streak":     bathy_quality_ph_counts.get(5,0) + bathy_quality_ph_counts.get(15,0) + bathy_quality_ph_counts.get(25,0),
+                "quality_nominal":          quality_ph_counts.get(0,0) + quality_ph_counts.get(10,0) + quality_ph_counts.get(20,0),
+                "quality_afterpulse":       quality_ph_counts.get(1,0) + quality_ph_counts.get(11,0) + quality_ph_counts.get(21,0),
+                "quality_impulse":          quality_ph_counts.get(2,0) + quality_ph_counts.get(12,0) + quality_ph_counts.get(22,0),
+                "quality_tep":              quality_ph_counts.get(3,0),
+                "quality_burst":            quality_ph_counts.get(4,0) + quality_ph_counts.get(14,0) + quality_ph_counts.get(24,0),
+                "quality_streak":           quality_ph_counts.get(5,0) + quality_ph_counts.get(15,0) + quality_ph_counts.get(25,0),
 
-            "bathy_depth_mean":         bathy_gdf["depth"].mean(),
-            "bathy_depth_median":       bathy_gdf["depth"].median(),
-            "bathy_depth_min":          bathy_gdf["depth"].min(),
-            "bathy_depth_max":          bathy_gdf["depth"].max(),
-            "bathy_depth_std":          bathy_gdf["depth"].std(),
+                "bathy_quality_nominal":    bathy_quality_ph_counts.get(0,0) + bathy_quality_ph_counts.get(10,0) + bathy_quality_ph_counts.get(20,0),
+                "bathy_quality_afterpulse": bathy_quality_ph_counts.get(1,0) + bathy_quality_ph_counts.get(11,0) + bathy_quality_ph_counts.get(21,0),
+                "bathy_quality_impulse":    bathy_quality_ph_counts.get(2,0) + bathy_quality_ph_counts.get(12,0) + bathy_quality_ph_counts.get(22,0),
+                "bathy_quality_tep":        bathy_quality_ph_counts.get(3,0),
+                "bathy_quality_burst":      bathy_quality_ph_counts.get(4,0) + bathy_quality_ph_counts.get(14,0) + bathy_quality_ph_counts.get(24,0),
+                "bathy_quality_streak":     bathy_quality_ph_counts.get(5,0) + bathy_quality_ph_counts.get(15,0) + bathy_quality_ph_counts.get(25,0),
 
-            "surface_roughness_mean":   roughness_bins.mean(),
-            "surface_roughness_median": roughness_bins.median(),
-            "surface_roughness_min":    roughness_bins.min(),
-            "surface_roughness_max":    roughness_bins.max(),
-            "surface_roughness_std":    roughness_bins.std(),
+                "bathy_depth_mean":         bathy_gdf["depth"].mean(),
+                "bathy_depth_median":       bathy_gdf["depth"].median(),
+                "bathy_depth_min":          bathy_gdf["depth"].min(),
+                "bathy_depth_max":          bathy_gdf["depth"].max(),
+                "bathy_depth_std":          bathy_gdf["depth"].std(),
 
-            "kd_mean":                  kd_bins.mean(),
-            "kd_median":                kd_bins.median(),
-            "kd_min":                   kd_bins.min(),
-            "kd_max":                   kd_bins.max(),
-            "kd_std":                   kd_bins.std(),
-        }
+                "bathy_kd_mean":            bathy_gdf["kd"].mean(),
+                "bathy_kd_median":          bathy_gdf["kd"].median(),
+                "bathy_kd_min":             bathy_gdf["kd"].min(),
+                "bathy_kd_max":             bathy_gdf["kd"].max(),
+                "bathy_kd_std":             bathy_gdf["kd"].std(),
 
-        # status
-        result["messages"].append(f"Adding {beam} with {output[beam]['photons']} photons to result")
+                "bathy_confidence_mean":    bathy_gdf["confidence"].mean(),
+                "bathy_confidence_median":  bathy_gdf["confidence"].median(),
+                "bathy_confidence_min":     bathy_gdf["confidence"].min(),
+                "bathy_confidence_max":     bathy_gdf["confidence"].max(),
+                "bathy_confidence_std":     bathy_gdf["confidence"].std(),
+
+                "bathy_linear_coverage":    bathy_unique_segments * SEGMENT_SIZE,
+                "bathy_night_photons":      int(((bathy_gdf["processing_flags"].to_numpy() & 0x20) != 0).sum()),
+                "sea_surface_std":          sea_surface_gdf["geoid_corr_h"].std(),
+                "solar_elevation_mean":     bathy_gdf["ref_el"].mean(),
+
+                "surface_roughness_mean":   roughness_bins.mean(),
+                "surface_roughness_median": roughness_bins.median(),
+                "surface_roughness_min":    roughness_bins.min(),
+                "surface_roughness_max":    roughness_bins.max(),
+                "surface_roughness_std":    roughness_bins.std(),
+
+                "kd_mean":                  kd_bins.mean(),
+                "kd_median":                kd_bins.median(),
+                "kd_min":                   kd_bins.min(),
+                "kd_max":                   kd_bins.max(),
+                "kd_std":                   kd_bins.std(),
+            }
 
     # set grid in output - 0.25 deg cells: row 0 = 90S, col 0 = 180W
     bathy_all = gdf[gdf["class_ph"] == 40]
