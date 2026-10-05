@@ -56,25 +56,25 @@ def parse_url(url):
     subfolder = '/'.join(path.split("/")[1:])
     return bucket, subfolder
 
+# modify granule to point to parquet
+if "ATL03" in granule: # convert to ATL24 granule name
+    granule = granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.parquet")
+
 # initialize result
+input_file = f"s3://sliderule-public/atl24r3/parquet/{granule}"
+output_file = f"s3://sliderule-public/atl24r3/json/{granule.replace(".parquet", ".json")}"
 result = {
     "status": True,
     "build": "local",
     "start": time.time(),
-    "outputs": [],
+    "outputs": [output_file],
     "messages": []
 }
 
 try:
     # read granule into GeoDataFrames
-    if "ATL03" in granule: # convert to ATL24 granule name
-        granule = granule.replace("ATL03", "ATL24").replace(".h5", "_003_01.parquet")
     result["messages"].append(f"Processing {granule}")
-    gdf = gpd.read_parquet(f"s3://sliderule-public/atl24r3/parquet/{granule}")
-
-    # granule orbit stats
-    month = int(granule[10:12])
-    region = int(granule[27:29])
+    gdf = gpd.read_parquet(input_file)
 
     # get polygon
     hull = gdf.geometry.union_all().convex_hull
@@ -85,6 +85,21 @@ try:
         buffers.append(scale(circle, xfact=lon_scale, yfact=1.0, origin=(lon, lat)))
     poly = shapely.GeometryCollection(buffers).convex_hull.simplify(0.005)
     poly_str = ' '.join([f'{x:.6f} {y:.6f}' for x, y in poly.exterior.coords])
+
+    # initialize output
+    grid = np.zeros((720, 1440), dtype=np.uint32)
+    month = int(granule[10:12])
+    region = int(granule[27:29])
+    output = {
+        "granule": {
+            "name":         granule,
+            "region":       region,
+            "season":       MONTH_TO_SEASON[region<8][month],
+            "polygon":      poly_str,
+            "begin_time":   gdf.index.min().isoformat(),
+            "end_time":     gdf.index.max().isoformat()
+        }
+    }
 
     # process each beam
     for beam in BEAMS:
@@ -99,13 +114,20 @@ try:
         sea_surface_gdf = beam_gdf[beam_gdf["class_ph"] == 41]
         subaqueous_gdf = beam_gdf[beam_gdf["class_ph"].isin([0, 1, 40]) & (beam_gdf['geoid_corr_h'] < beam_gdf['surface_h'])]
 
-        # set row elements
-        row = {
-            "granule":                  granule,
-            "beam":                     beam,
-            "region":                   region,
-            "season":                   MONTH_TO_SEASON[region<8][month],
+        # update grid
+        # convert lat/lon to 0.25 degree grid indices
+        # lat: -90 to 90 -> row 0 (south) to 719 (north)
+        # lon: -180 to 180 -> col 0 (west) to 1439 (east)
+        for lon, lat in zip(bathy_gdf.geometry.x, bathy_gdf.geometry.y):
+            row = int((lat + 90) / 0.25)
+            col = int((lon + 180) / 0.25)
+            row = min(max(row, 0), 719)
+            col = min(max(col, 0), 1439)
+            grid[row, col] += 1
 
+        # set beam elements
+        output[beam] = {
+            "beam":                     beam,
             "photons":                  len(beam_gdf),
             "subaqueous":               len(subaqueous_gdf),
 
@@ -146,15 +168,23 @@ try:
             "kd_min":                   subaqueous_gdf["kd"].min(),
             "kd_max":                   subaqueous_gdf["kd"].max(),
             "kd_std":                   subaqueous_gdf["kd"].std(),
-
-            "polygon":                  poly_str,
-            "begin_time":               extent["begin_time"],
-            "end_time":                 extent["end_time"]
         }
 
-        # add row
-        result["messages"].append(f"Adding {beam} with {row["photons"]} photons to result")
-        result[beam] = row
+        # status
+        result["messages"].append(f"Adding {beam} with {output[beam]["photons"]} photons to result")
+
+    # set grid in output
+    lons, lats = np.where(grid > 0) # Find all non-zero cells
+    cnts = [grid[lon,lat] for lon,lat in zip(lons,lats)]
+    output["grid"] = {
+        "lons": lons,
+        "lats": lats,
+        "cnts": cnts
+    }
+
+    # write outputs
+    bucket, key = parse_url(output_file)
+    s3.put_object(Bucket=bucket, Key=key, Body=output)
 
 except Exception as e:
 
