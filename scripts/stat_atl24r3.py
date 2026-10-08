@@ -99,7 +99,7 @@ result = {
 try:
     # read granule into GeoDataFrames
     result["messages"].append(f"Processing {granule}")
-    gdf = gpd.read_parquet(input_file, columns=["geometry", "gt", "spot", "index_seg", "class_ph", "quality_ph", "surface_h", "geoid_corr_h", "x_atc", "kd", "surface_roughness", "processing_flags", "ref_el", "confidence"])
+    gdf = gpd.read_parquet(input_file, columns=["geometry", "gt", "spot", "index_seg", "class_ph", "quality_ph", "max_signal_conf", "surface_h", "geoid_corr_h", "x_atc", "kd", "surface_roughness", "processing_flags", "ref_el", "confidence"])
     gdf["depth"] = gdf["surface_h"] - gdf["geoid_corr_h"]
 
     # get polygon; longitudes are unwrapped in time order so antimeridian and polar crossings stay continuous (lon may exceed 180)
@@ -141,6 +141,7 @@ try:
 
             # perform initial analysis on dataframe
             class_ph_counts = spot_gdf["class_ph"].value_counts()
+            max_signal_conf_counts = spot_gdf["max_signal_conf"].value_counts()
             quality_ph_counts = spot_gdf["quality_ph"].value_counts()
             bathy_gdf = spot_gdf[spot_gdf["class_ph"] == 40]
             bathy_quality_ph_counts = bathy_gdf["quality_ph"].value_counts()
@@ -162,6 +163,14 @@ try:
                 "class_noise":              class_ph_counts.get(0, 0),
                 "class_idk":                class_ph_counts.get(1, 0),
                 "class_ground":             class_ph_counts.get(2, 0),
+
+                "cnf_tep":                  max_signal_conf_counts.get(-2, 0),
+                "cnf_not_considered":       max_signal_conf_counts.get(-1, 0),
+                "cnf_background":           max_signal_conf_counts.get(0, 0),
+                "cnf_within_10m":           max_signal_conf_counts.get(1, 0),
+                "cnf_surface_low":          max_signal_conf_counts.get(2, 0),
+                "cnf_surface_medium":       max_signal_conf_counts.get(3, 0),
+                "cnf_surface_high":         max_signal_conf_counts.get(4, 0),
 
                 "quality_nominal":          quality_ph_counts.get(0,0) + quality_ph_counts.get(10,0) + quality_ph_counts.get(20,0),
                 "quality_afterpulse":       quality_ph_counts.get(1,0) + quality_ph_counts.get(11,0) + quality_ph_counts.get(21,0),
