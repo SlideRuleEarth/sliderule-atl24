@@ -94,6 +94,10 @@ platinum-run: # needs CYCLE
 	python scripts/gen_cycle_dataset.py $(CYCLE)
 	sliderule-runner submit atl24r3_cycle_$(CYCLE) scripts/gen_atl24r3.lua data/atl03_granules_cycle_$(CYCLE).txt --image sliderule:atl24
 
+platinum-rerun:
+	sliderule-runner scrape --status errors --output /data/ATL24/atl24r3_errors.txt
+	sliderule-runner submit atl24r3_rerun scripts/gen_atl24r3.lua /data/ATL24/atl24r3_errors.txt --image sliderule:atl24 --memory 24000 --vcpus 8
+
 platinum-check: # needs CYCLE
 	python scripts/check_atl24r3.py --atl03_granules data/atl03_granules_cycle_$(CYCLE).txt
 
